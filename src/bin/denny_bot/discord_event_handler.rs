@@ -9,10 +9,6 @@ use serenity::model::channel::Message;
 pub struct Handler;
 
 impl EventHandler for Handler {
-    fn message (&self, ctx: Context, msg: Message) {
-
-    }
-
     fn reaction_add(&self, ctx: Context, reaction: Reaction) {
         add_role_rules_verified(&ctx, &reaction);
     }
