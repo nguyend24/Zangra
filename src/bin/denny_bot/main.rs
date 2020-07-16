@@ -6,7 +6,6 @@ use serenity::{
 use std::env;
 
 use commands::{math::*, ping::*};
-use user_information::BIRTHDAY_COMMAND;
 
 use discord_event_handler::Handler;
 use crate::twitch_webhook_handler::set_up_twitch_webhooks;
@@ -18,13 +17,11 @@ mod misc;
 mod twitch;
 mod twitch_webhook_handler;
 mod test_server;
-mod introductions;
-mod user_information;
 
 static VERSION: &str = "0.1.0";
 
 #[group]
-#[commands(ping, birthday)]
+#[commands(ping)]
 struct General;
 
 #[group]
