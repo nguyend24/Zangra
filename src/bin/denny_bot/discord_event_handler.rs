@@ -17,6 +17,6 @@ impl EventHandler for Handler {
         println!("{} is connected!", ready.user.name);
         println!("Version: {}", VERSION);
 
-        set_up_twitch_webhooks(ctx);
+        // set_up_twitch_webhooks(ctx);
     }
 }
