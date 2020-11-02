@@ -44,7 +44,7 @@ pub fn _remove_role_rules_verified(ctx: &Context, remove_reaction: &Reaction) {
                 return
             }
         };
-        let mut reaction_member: Member = match ctx.cache.read().member(&guild_id, &remove_reaction.user_id) {
+        let mut reaction_member: Member = match ctx.cache.read().member(guild_id, &remove_reaction.user_id) {
             Some(member) => member,
             None => {
                 println!("remove_role_rules_verified - member not found");
