@@ -12,7 +12,7 @@ rand = "0.7"
 chrono = "0.4"
 
 [dependencies.serenity]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["builder", "cache", "client", "framework", "gateway", "http", "model", "standard_framework", "utils", "rustls_backend", "voice"]
 
