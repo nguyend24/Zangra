@@ -19,3 +19,7 @@ features = ["builder", "cache", "client", "framework", "gateway", "http", "model
 [dependencies.reqwest]
 version = "0.10.6"
 features = ["blocking"]
+
+[dependencies.tokio]
+version = "0.3"
+features = ["macros", "signal", "rt", "rt-multi-thread"]

@@ -28,7 +28,8 @@ struct General;
 #[commands(multiply)]
 struct Math;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     let framework = StandardFramework::new().configure(
         |c| c
@@ -40,9 +41,11 @@ fn main() {
         .group(&MATH_GROUP);
     let mut client = Client::builder(token)
         .event_handler(Handler)
-        .framework(framework);
+        .framework(framework)
+        .await
+        .expect("Error creating client");
 
-    if let Err(why) = client.start() {
+    if let Err(why) = client.start().await {
         println!("Client error: {:?}", why);
     }
 }
