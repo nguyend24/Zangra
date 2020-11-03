@@ -16,14 +16,14 @@ use serenity::model::channel::Message;
 use crate::twitch::helix::games::Game;
 use std::sync::{Arc, RwLock};
 use serenity::http::Http;
-use serenity::cache::CacheRwLock;
+use serenity::cache::{Cache};
 use crate::twitch::helix::users::User;
 
 use rand::prelude::*;
 
 pub(crate) struct WebhookHandler {
     http: Arc<Http>,
-    cache: CacheRwLock,
+    cache: Arc<Cache>,
 }
 
 impl WebhookEvents for WebhookHandler {
