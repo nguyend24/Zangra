@@ -58,7 +58,7 @@ pub fn set_up_twitch_webhooks(ctx: Context) {
 
 const THUMBNAIL_WIDTH: u64 = 360;
 const THUMBNAIL_HEIGHT: u64 = 180;
-fn send_twitch_live_message(http: &Arc<Http>, response: &WebhookResponse) {
+async fn send_twitch_live_message(http: &Arc<Http>, response: &WebhookResponse) {
     const TWITCH_COLOR: Color = Color::from_rgb(100, 65, 164);
 
     let url: String = String::from("https://www.twitch.tv/") + &response.user_name;
@@ -102,7 +102,7 @@ fn send_twitch_live_message(http: &Arc<Http>, response: &WebhookResponse) {
                 .image(&thumbnail_url)
                 .color(TWITCH_COLOR)
         })
-    }) {
+    }).await {
         println!("send_twitch_live_message(): Error sending message: {}", why);
     };
 }
