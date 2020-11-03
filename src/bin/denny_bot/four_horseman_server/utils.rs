@@ -7,6 +7,7 @@ use serenity::{
     },
     utils::Color,
 };
+use serenity::model::channel::ReactionType;
 
 static FOUR_HORSEMAN_MESSAGE_ID: u64 = 716047715208921110;
 static FOUR_HORSEMAN_ROLE_ID: u64 = 715247696663019560;
@@ -73,7 +74,7 @@ pub async fn _remove_role_rules_verified(ctx: &Context, remove_reaction: &Reacti
 }
 
 //Sends a set of rules to the rules channel
-pub fn print_rules(ctx: &Context) {
+pub async fn print_rules(ctx: &Context) {
     if let Err(why) =  ChannelId(714691912787034113).send_message(ctx, |m| {
         m.embed(|e| {
             e.title("Rules")
@@ -103,8 +104,8 @@ pub fn print_rules(ctx: &Context) {
                 )
                 .field("Heads & Staff", "<@&714698133057175633>", false)
         })
-        .reactions(vec!["✅"])
-    }) {
+        .reactions(vec![ReactionType::Unicode(String::from("✅"))])
+    }).await {
         println!("Error sending message: print_rules(): {}", why);
     }
 }
