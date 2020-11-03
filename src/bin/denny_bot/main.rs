@@ -30,15 +30,17 @@ struct Math;
 
 fn main() {
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
-    let mut client = Client::new(&token, Handler).expect("Error creating client");
-
-    client.with_framework(StandardFramework::new().configure(|c|
-        c
-            .with_whitespace(true)
+    let framework = StandardFramework::new().configure(
+        |c| c
+            .prefix("~")
             .ignore_bots(true)
-            .prefix("~"))
+            .with_whitespace(true)
+    )
         .group(&GENERAL_GROUP)
-        .group(&MATH_GROUP));
+        .group(&MATH_GROUP);
+    let mut client = Client::builder(token)
+        .event_handler(Handler)
+        .framework(framework);
 
     if let Err(why) = client.start() {
         println!("Client error: {:?}", why);
