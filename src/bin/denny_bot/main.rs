@@ -36,10 +36,9 @@ async fn main() {
             .prefix("~")
             .ignore_bots(true)
             .with_whitespace(true)
-    )
-        .group(&GENERAL_GROUP)
-        .group(&MATH_GROUP);
-    let mut client = Client::builder(token)
+    );
+
+    let mut client = Client::builder(&token)
         .event_handler(Handler)
         .framework(framework)
         .await
