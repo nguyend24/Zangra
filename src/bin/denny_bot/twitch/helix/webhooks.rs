@@ -151,10 +151,11 @@ fn handle_stream_changed(event_handler: &Box<dyn WebhookEvents>, response: &str)
     Some(())
 }
 
-pub trait WebhookEvents: Send {
-    fn stream_live(&self, response: WebhookResponse) {}
+#[async_trait::async_trait]
+pub trait WebhookEvents: Send+Sync {
+    async fn stream_live(&self, response: WebhookResponse) {}
 
-    fn stream_offline(&self) {}
+    async fn stream_offline(&self) {}
 
-    fn ready(&self) {}
+    async fn ready(&self) {}
 }

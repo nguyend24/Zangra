@@ -26,18 +26,19 @@ pub(crate) struct WebhookHandler {
     cache: Arc<Cache>,
 }
 
+#[async_trait::async_trait]
 impl WebhookEvents for WebhookHandler {
-    fn stream_live(&self, response: WebhookResponse) {
+    async fn stream_live(&self, response: WebhookResponse) {
         send_twitch_live_message(&self.http, &response);
     }
 
-    fn stream_offline(&self) {
-        if let Err(why) = ChannelId(557572781680754699).say(&self.http, "An unknown stream has gone offline") {
+    async fn stream_offline(&self) {
+        if let Err(why) = ChannelId(557572781680754699).say(&self.http, "An unknown stream has gone offline").await {
             println!("Error sending stream offline message: {}", why);
         };
     }
 
-    fn ready(&self) {
+    async fn ready(&self) {
         println!("Twitch webhooks listener ready!");
     }
 }
