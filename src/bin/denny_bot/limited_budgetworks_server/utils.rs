@@ -29,9 +29,9 @@ pub async fn add_role_rules_verified(ctx: &Context, add_reaction: &Reaction) {
                 return
             }
         };
-        let mut reaction_member = match ctx.cache.member(guild_id, user_id).await {
-            Some(member) => member,
-            None => {
+        let mut reaction_member = match ctx.http.get_member(*guild_id.as_u64(), *user_id.as_u64()).await {
+            Ok(member) => member,
+            Err(why) => {
                 println!("add_role_rules_verified - member not found");
                 return
             }

@@ -12,7 +12,7 @@ use crate::twitch_webhook_handler::set_up_twitch_webhooks;
 
 mod commands;
 mod discord_event_handler;
-mod four_horseman_server;
+mod limited_budgetworks_server;
 mod misc;
 mod twitch;
 mod twitch_webhook_handler;

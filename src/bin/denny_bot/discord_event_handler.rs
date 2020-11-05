@@ -1,4 +1,4 @@
-use crate::four_horseman_server::utils::add_role_rules_verified;
+use crate::limited_budgetworks_server::utils::add_role_rules_verified;
 use crate::twitch_webhook_handler::set_up_twitch_webhooks;
 use crate::VERSION;
 use serenity::model::prelude::{Reaction, Ready};
@@ -12,7 +12,7 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
-        add_role_rules_verified(&ctx, &reaction);
+        add_role_rules_verified(&ctx, &reaction).await;
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
