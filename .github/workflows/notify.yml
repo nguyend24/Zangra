@@ -1,0 +1,2 @@
+- name: Send Push Notification
+  uses: techulus/push-github-action@1.0.0
