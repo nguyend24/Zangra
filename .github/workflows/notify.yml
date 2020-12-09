@@ -1,0 +1,15 @@
+name: Push on commit
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Send Push Notification
+      uses: techulus/push-github-action@1.0.0
+      env:
+        API_KEY: "455c7b21-7fc9-43b0-9811-98e2e93411a6"
+        MESSAGE: "Hey Dennis Nguyen, there's a new build"
