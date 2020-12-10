@@ -17,6 +17,7 @@ mod misc;
 mod twitch;
 mod twitch_webhook_handler;
 mod test_server;
+mod config;
 
 static VERSION: &str = "0.1.0";
 
@@ -36,7 +37,9 @@ async fn main() {
             .prefix("~")
             .ignore_bots(true)
             .with_whitespace(true)
-    );
+    )
+        .group(&GENERAL_GROUP)
+        .group(&MATH_GROUP);
 
     let mut client = Client::builder(&token)
         .event_handler(Handler)
