@@ -1,26 +1,29 @@
 use serenity::{
-    framework::{standard::macros::group, StandardFramework},
-    Client,
+    async_trait,
+    client::{Client, Context, EventHandler},
+    framework::{
+        standard::macros::group,
+        StandardFramework},
+    model::{
+        id::{ChannelId, GuildId},
+        channel::Reaction,
+        guild::Member,
+        gateway::Ready},
+
+    utils::Color,
 };
 
 use std::env;
 
 use commands::{math::*, ping::*};
 
-use serenity::utils::Color;
-use serenity::async_trait;
-use serenity::model::id::{ChannelId, GuildId};
-use serenity::client::{Context, EventHandler};
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified};
-use serenity::model::channel::Reaction;
-use serenity::model::guild::Member;
-use serenity::model::gateway::Ready;
 
 mod commands;
+mod config;
 mod limited_budgetworks_server;
 mod misc;
 mod test_server;
-mod config;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
