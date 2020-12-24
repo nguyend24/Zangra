@@ -81,6 +81,7 @@ async fn main() {
             .prefix("~")
             .ignore_bots(true)
             .with_whitespace(true)
+            .case_insensitivity(true)
     )
         .group(&GENERAL_GROUP)
         .group(&MATH_GROUP);
