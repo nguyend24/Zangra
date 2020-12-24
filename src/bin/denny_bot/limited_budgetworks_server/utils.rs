@@ -1,13 +1,12 @@
 use serenity::{
     client::Context,
     model::{
-        channel::Reaction,
-        id::{ChannelId, GuildId, RoleId},
+        channel::{Reaction, ReactionType},
+        id::{ChannelId, RoleId},
         guild::Member
     },
     utils::Color,
 };
-use serenity::model::channel::ReactionType;
 
 static FOUR_HORSEMAN_MESSAGE_ID: u64 = 716047715208921110;
 static FOUR_HORSEMAN_ROLE_ID: u64 = 715247696663019560;
@@ -40,7 +39,7 @@ pub async fn add_role_rules_verified(ctx: &Context, add_reaction: &Reaction) {
         let mut reaction_member = match ctx.http.get_member(*guild_id.as_u64(), *user_id.as_u64()).await {
             Ok(member) => member,
             Err(why) => {
-                println!("add_role_rules_verified - member not found");
+                println!("add_role_rules_verified - member not found, Why: {}", why);
                 return
             }
         };
@@ -82,7 +81,7 @@ pub async fn _remove_role_rules_verified(ctx: &Context, remove_reaction: &Reacti
 }
 
 //Sends a set of rules to the rules channel
-pub async fn print_rules(ctx: &Context) {
+pub async fn _print_rules(ctx: &Context) {
     if let Err(why) =  ChannelId(714691912787034113).send_message(ctx, |m| {
         m.embed(|e| {
             e.title("Rules")

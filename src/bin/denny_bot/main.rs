@@ -7,7 +7,6 @@ use std::env;
 
 use commands::{math::*, ping::*};
 
-use crate::twitch_webhook_handler::set_up_twitch_webhooks;
 use serenity::utils::Color;
 use serenity::async_trait;
 use serenity::model::id::{ChannelId, GuildId};
@@ -20,8 +19,6 @@ use serenity::model::gateway::Ready;
 mod commands;
 mod limited_budgetworks_server;
 mod misc;
-mod twitch;
-mod twitch_webhook_handler;
 mod test_server;
 mod config;
 
@@ -70,7 +67,6 @@ impl EventHandler for Handler {
         }).await {
             println!("{}", why)
         };
-        // set_up_twitch_webhooks(ctx);
     }
 }
 
@@ -86,7 +82,7 @@ async fn main() {
         .group(&GENERAL_GROUP)
         .group(&MATH_GROUP);
 
-    let mut client = Client::builder(&token)
+    let mut client = Client::builder(token)
         .event_handler(Handler)
         .framework(framework)
         .await

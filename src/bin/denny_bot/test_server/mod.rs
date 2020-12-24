@@ -1,8 +1,6 @@
 use serenity::model::id::RoleId;
 use serenity::prelude::Context;
 use serenity::model::channel::Reaction;
-use serenity::http::CacheHttp;
-use std::convert::TryFrom;
 
 pub async fn _reaction_add_test(ctx: &Context, reaction: &Reaction) {
     let guild_id = match reaction.guild_id {

@@ -1,1 +1,0 @@
-pub type Result<T> = std::error::Error;
