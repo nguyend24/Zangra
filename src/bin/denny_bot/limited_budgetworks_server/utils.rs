@@ -12,6 +12,14 @@ use serenity::model::channel::ReactionType;
 static FOUR_HORSEMAN_MESSAGE_ID: u64 = 716047715208921110;
 static FOUR_HORSEMAN_ROLE_ID: u64 = 715247696663019560;
 
+pub async fn add_member_join_role(ctx: &Context, new_member: Member) {
+    let role_to_add = RoleId(FOUR_HORSEMAN_ROLE_ID);
+    let mut member = new_member.clone();
+    if let Err(why) = member.add_role(ctx, role_to_add).await {
+        println!("Error adding role: {:?}", why);
+    }
+}
+
 //Hardcoded role verification for Preston's Community Server
 pub async fn add_role_rules_verified(ctx: &Context, add_reaction: &Reaction) {
     if add_reaction.message_id.as_u64() == &FOUR_HORSEMAN_MESSAGE_ID {
@@ -38,7 +46,7 @@ pub async fn add_role_rules_verified(ctx: &Context, add_reaction: &Reaction) {
         };
         let role_to_add = RoleId(FOUR_HORSEMAN_ROLE_ID);
         if let Err(why) = reaction_member.add_role(ctx, role_to_add).await {
-            println!("Error adding role: {:?}", why)
+            println!("Error adding role: {:?}", why);
         }
     }
 }
