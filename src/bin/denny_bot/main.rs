@@ -105,18 +105,17 @@ impl EventHandler for Handler {
 
         if let Err(why) = ChannelId(773036830580408330).send_message(&ctx, |m| {
             m
-                .embed(|e| {
-                    e
-                        .author(|a| {
-                            a.icon_url(&ready.user.face())
-                                .name(&ready.user.name)
-                        })
-                        .description(format!("\
-                        {} is connected!\n\
-                        Version: {}
-                        ", &ready.user.name, &VERSION))
-                        .color(Color::from_rgb(255, 128, 0))
-                })
+                .embed(|e| e
+                    .author(|a|  a
+                        .icon_url(&ready.user.face())
+                        .name(&ready.user.name)
+                    )
+                    .description(format!("\
+                      {} is connected!\n\
+                      Version: {}
+                      ", &ready.user.name, &VERSION))
+                    .color(Color::from_rgb(255, 128, 0))
+                )
         }).await {
             println!("{}", why)
         };
