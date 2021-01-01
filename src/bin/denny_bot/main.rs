@@ -18,6 +18,14 @@ use std::env;
 use commands::{math::*, ping::*};
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified};
+use std::fs::File;
+use std::io::{Read, Write};
+
+use serde::{
+    Deserialize, // To deserialize data into structures
+    Serialize,
+};
+
 
 mod commands;
 mod config;
@@ -34,6 +42,47 @@ struct General;
 #[group]
 #[commands(multiply)]
 struct Math;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ConfigurationData {
+    pub discord_token: String,
+}
+
+fn read_configuration() -> ConfigurationData {
+    let empty_config = r#"
+    discord_token = ""
+    "#;
+
+    match File::open("config.toml") {
+        Ok(mut file) => {
+            let mut contents = String::new();
+            file.read_to_string(&mut contents).unwrap();
+            let configuration = toml::from_str::<ConfigurationData>(&contents).unwrap();
+
+            configuration
+        }
+
+        Err(why) => {
+            println!("Unable to open config file. Why: {}", why);
+            match File::create("config.toml") {
+                Ok(mut empty_file) => {
+                    match empty_file.write(empty_config.as_bytes()) {
+                        Ok(_) => {}
+                        Err(_) => {}
+                    };
+                    let configuration = toml::from_str::<ConfigurationData>(&empty_config).unwrap();
+
+                    configuration
+                }
+
+                Err(why) => {
+                    println!("Unable to create empty config file: {}", why);
+                    panic!();
+                }
+            }
+        }
+    }
+}
 
 pub struct Handler;
 
@@ -75,7 +124,10 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    let configuration = read_configuration();
+
+    let discord_token = configuration.discord_token;
+
     let framework = StandardFramework::new().configure(
         |c| c
             .prefix("~")
@@ -86,7 +138,7 @@ async fn main() {
         .group(&GENERAL_GROUP)
         .group(&MATH_GROUP);
 
-    let mut client = Client::builder(token)
+    let mut client = Client::builder(discord_token)
         .event_handler(Handler)
         .framework(framework)
         .await

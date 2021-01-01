@@ -26,21 +26,21 @@ pub async fn add_role_rules_verified(ctx: &Context, add_reaction: &Reaction) {
             Some(id) => id,
             None => {
                 println!("add_role_rules_verified - guild id not found");
-                return
+                return;
             }
         };
         let user_id = match add_reaction.user_id {
             Some(id) => id,
             None => {
                 println!("add_roles_rules_verified - user id not found");
-                return
+                return;
             }
         };
         let mut reaction_member = match ctx.http.get_member(*guild_id.as_u64(), *user_id.as_u64()).await {
             Ok(member) => member,
             Err(why) => {
                 println!("add_role_rules_verified - member not found, Why: {}", why);
-                return
+                return;
             }
         };
         let role_to_add = RoleId(FOUR_HORSEMAN_ROLE_ID);
@@ -52,25 +52,25 @@ pub async fn add_role_rules_verified(ctx: &Context, add_reaction: &Reaction) {
 
 pub async fn _remove_role_rules_verified(ctx: &Context, remove_reaction: &Reaction) {
     if remove_reaction.message_id.as_u64() == &FOUR_HORSEMAN_MESSAGE_ID {
-        let guild_id= match remove_reaction.guild_id {
+        let guild_id = match remove_reaction.guild_id {
             Some(id) => id,
             None => {
                 println!("remove_role_rules_verified - guild id not found");
-                return
+                return;
             }
         };
         let user_id = match remove_reaction.user_id {
             Some(id) => id,
             None => {
                 println!("add_roles_rules_verified - user id not found");
-                return
+                return;
             }
         };
         let mut reaction_member: Member = match ctx.cache.member(guild_id, user_id).await {
             Some(member) => member,
             None => {
                 println!("remove_role_rules_verified - member not found");
-                return
+                return;
             }
         };
         let role_to_remove: RoleId = RoleId(FOUR_HORSEMAN_ROLE_ID);
@@ -82,7 +82,7 @@ pub async fn _remove_role_rules_verified(ctx: &Context, remove_reaction: &Reacti
 
 //Sends a set of rules to the rules channel
 pub async fn _print_rules(ctx: &Context) {
-    if let Err(why) =  ChannelId(714691912787034113).send_message(ctx, |m| {
+    if let Err(why) = ChannelId(714691912787034113).send_message(ctx, |m| {
         m.embed(|e| {
             e.title("Rules")
                 .description("This is a place where you learn a little bit more of the base rules to follow while chilling in the community (^-^):")
@@ -111,7 +111,7 @@ pub async fn _print_rules(ctx: &Context) {
                 )
                 .field("Heads & Staff", "<@&714698133057175633>", false)
         })
-        .reactions(vec![ReactionType::Unicode(String::from("✅"))])
+            .reactions(vec![ReactionType::Unicode(String::from("✅"))])
     }).await {
         println!("Error sending message: print_rules(): {}", why);
     }
