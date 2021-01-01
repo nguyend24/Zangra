@@ -11,12 +11,23 @@ use serenity::{
 static FOUR_HORSEMAN_MESSAGE_ID: u64 = 716047715208921110;
 static FOUR_HORSEMAN_ROLE_ID: u64 = 715247696663019560;
 
-pub async fn add_member_join_role(ctx: &Context, new_member: Member) {
+pub async fn add_member_join_role(ctx: &Context, new_member: &Member) {
     let role_to_add = RoleId(FOUR_HORSEMAN_ROLE_ID);
     let mut member = new_member.clone();
     if let Err(why) = member.add_role(ctx, role_to_add).await {
         println!("Error adding role: {:?}", why);
     }
+}
+
+pub async fn add_member_welcome_message(ctx: &Context, new_member: &Member) {
+    let description = format!("Welcome <@{}> to Limited Budgetworks,\n\
+        hope you enjoy your stay!", new_member.user.id);
+
+    if let Err(why) = ChannelId(714692215577772085).send_message(ctx, |m| m.embed(|e|
+        e.description(description)
+            .image("https://media.discordapp.net/attachments/714340993129906306/729584384822476890/LBW_HI.gif"))).await {
+        println!("Error sending LimitedBudgetworks welcome message. Why: {}", why);
+    };
 }
 
 //Hardcoded role verification for Preston's Community Server

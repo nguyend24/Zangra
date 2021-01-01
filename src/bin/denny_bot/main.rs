@@ -17,7 +17,7 @@ use std::env;
 
 use commands::{math::*, ping::*};
 
-use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified};
+use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified, add_member_welcome_message};
 use std::fs::File;
 use std::io::{Read, Write};
 
@@ -90,7 +90,8 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn guild_member_addition(&self, ctx: Context, guild_id: GuildId, new_member: Member) {
         if guild_id.as_u64() == &713889872359981076 {
-            add_member_join_role(&ctx, new_member).await;
+            add_member_join_role(&ctx, &new_member).await;
+            add_member_welcome_message(&ctx, &new_member).await;
         }
     }
 
