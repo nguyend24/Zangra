@@ -15,7 +15,7 @@ use serenity::{
 
 use std::env;
 
-use commands::{math::*, ping::*};
+use commands::{math::*, ping::*, meta::*};
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified, add_member_welcome_message};
 use std::fs::File;
@@ -25,18 +25,22 @@ use serde::{
     Deserialize, // To deserialize data into structures
     Serialize,
 };
+use serenity::model::voice::VoiceState;
+
 
 
 mod commands;
 mod config;
+mod edbh;
 mod limited_budgetworks_server;
 mod misc;
 mod test_server;
+mod utils;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[group]
-#[commands(ping)]
+#[commands(ping, invis, online)]
 struct General;
 
 #[group]
@@ -119,6 +123,49 @@ impl EventHandler for Handler {
         }).await {
             println!("{}", why)
         };
+    }
+
+    async fn voice_state_update(&self, ctx: Context, guild_id: Option<GuildId>, old: Option<VoiceState>, new: VoiceState) {
+        if let Some(ref guild_id) = guild_id {
+            if guild_id.as_u64() == &687876072045412560_u64 {
+               edbh::utils::voice_state_changed(&ctx, &guild_id, &old, &new).await;
+            }
+        }
+
+        // if let Some(ref guild_id) = guild_id{
+        //     if guild_id.as_u64() == &373993407741427713_u64 {
+        //         if let Some(state_change) = identify_state(guild_id, &old, &new) {
+        //             println!("{}", &state_change);
+        //
+        //             match state_change {
+        //                 VoiceStateChange::LeftVoiceChannel => {
+        //                     if let Err(why) = ChannelId(805612483951722496).send_message(&ctx, |m| m
+        //                         .embed(|e| e
+        //                             .title("User left Voice Channel")
+        //                             .author(|a| a
+        //                                 .name(format!("{}#{}", &new.member.as_ref().unwrap().user.name, &new.member.as_ref().unwrap().user.discriminator))
+        //                                 .icon_url(new.member.as_ref().unwrap().user.avatar_url().unwrap())
+        //                             )
+        //                             .field("Member", &new.member.as_ref().unwrap().user.name, false)
+        //                             .timestamp(Utc::now().to_rfc3339()))).await {
+        //                         println!("Error sending test voice log. Why: {}", why);
+        //                     };
+        //                 }
+        //                 VoiceStateChange::JoinedVoiceChannel => {}
+        //                 VoiceStateChange::ServerDeafened => {}
+        //                 VoiceStateChange::ServerMuted => {}
+        //                 VoiceStateChange::SelfDeafened => {}
+        //                 VoiceStateChange::SelfMuted => {}
+        //                 VoiceStateChange::SelfStream => {}
+        //                 VoiceStateChange::SelfVideo => {}
+        //                 VoiceStateChange::Suppress => {}
+        //             }
+        //         }
+        //     }
+        // }
+
+
+
     }
 }
 

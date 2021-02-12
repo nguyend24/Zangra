@@ -14,7 +14,7 @@ async-trait = "0.1"
 toml = "0.5"
 
 [dependencies.serenity]
-version = "0.9"
+version = "0.10"
 default-features = false
 features = ["builder", "cache", "client", "framework", "gateway", "http", "model", "standard_framework", "utils", "rustls_backend", "voice"]
 
@@ -23,9 +23,9 @@ features = ["builder", "cache", "client", "framework", "gateway", "http", "model
 #features = ["blocking"]
 
 [dependencies.tokio]
-version = "0.2"
+version = "1"
 features = ["full"]
 
 [dependencies.serde]
-version = "1.0"
+version = "1"
 features = ["derive"]
