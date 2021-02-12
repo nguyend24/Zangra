@@ -10,7 +10,9 @@ pub async fn voice_state_changed(ctx: &Context, guild_id: &GuildId, old: &Option
             VoiceStateChange::LeftVoiceChannel => {
                 left_voice_channel(ctx, guild_id, old, new).await;
             }
-            VoiceStateChange::JoinedVoiceChannel => {}
+            VoiceStateChange::JoinedVoiceChannel => {
+                joined_voice_channel(ctx, guild_id, new).await;
+            }
             VoiceStateChange::MovedVoiceChannel => {}
             VoiceStateChange::ServerDeafened => {}
             VoiceStateChange::ServerMuted => {}
@@ -40,6 +42,27 @@ async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<Vo
             )
             .field("Member", &name, false)
             .timestamp(Utc::now().to_rfc3339()))).await {
-        println!("Error sending Big hippo voice log. Why: {}", why);
+        println!("Error sending BH left message. Why: {}", why);
+    };
+}
+
+async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceState) {
+    let member = new.member.as_ref().unwrap();
+    let name: String = member.user.name.clone();
+    let icon_url: String = match member.user.avatar_url() {
+        Some(url) => url,
+        None => String::from("https://www.denofgeek.com/wp-content/uploads/2020/06/Discord.png")
+    };
+
+    if let Err(why) = ChannelId(805186168647974964).send_message(&ctx, |m| m
+        .embed(|e| e
+            .title("User joined Voice Channel")
+            .author(|a| a
+                .name(&name)
+                .icon_url(icon_url)
+            )
+            .field("Member", &name, false)
+            .timestamp(Utc::now().to_rfc3339()))).await {
+        println!("Error sending BH join message. Why: {}", why);
     };
 }
