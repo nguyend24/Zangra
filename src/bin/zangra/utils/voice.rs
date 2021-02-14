@@ -39,9 +39,11 @@ pub fn identify_state(_guild_id: &GuildId, old_state: &Option<VoiceState>, new: 
     }
     let old_state: &VoiceState = old_state.as_ref().unwrap();
 
-    if let Some(_old_id) = old_state.channel_id {
-        if let Some(_new_id) = new.channel_id {
-            return Some(VoiceStateChange::MovedVoiceChannel)
+    if let Some(old_id) = old_state.channel_id {
+        if let Some(new_id) = new.channel_id {
+            if old_id.as_u64() != new_id.as_u64() {
+                return Some(VoiceStateChange::MovedVoiceChannel)
+            }
         }
     }
 
