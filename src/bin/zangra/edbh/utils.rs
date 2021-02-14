@@ -37,12 +37,11 @@ async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<Vo
 
     if let Err(why) = ChannelId(805186168647974964).send_message(&ctx, |m| m
         .embed(|e| e
-            .title("User left Voice Channel")
+            .title(format!("{} left Voice Channel", &name))
             .author(|a| a
                 .name(&name)
                 .icon_url(icon_url)
             )
-            .field("Member", &name, false)
             .timestamp(Utc::now().to_rfc3339()))).await {
         println!("Error sending BH left message. Why: {}", why);
     };
@@ -58,12 +57,11 @@ async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceSta
 
     if let Err(why) = ChannelId(805186168647974964).send_message(&ctx, |m| m
         .embed(|e| e
-            .title("User joined Voice Channel")
+            .title(format!("{} joined Voice Channel", &name))
             .author(|a| a
                 .name(&name)
                 .icon_url(icon_url)
             )
-            .field("Member", &name, false)
             .timestamp(Utc::now().to_rfc3339()))).await {
         println!("Error sending BH join message. Why: {}", why);
     };
