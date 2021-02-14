@@ -5,6 +5,7 @@ use crate::utils::voice::{VoiceStateChange, identify_state};
 use chrono::Utc;
 
 const DEFAULT_AVATAR: &str = "https://www.denofgeek.com/wp-content/uploads/2020/06/Discord.png";
+const LOG_CHANNEL_ID: u64 = 805186168647974964;
 
 pub async fn voice_state_changed(ctx: &Context, guild_id: &GuildId, old: &Option<VoiceState>, new: &VoiceState) {
     if let Some(state_change) = identify_state(guild_id, &old, &new) {
@@ -37,7 +38,7 @@ async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<Vo
         None => String::from(DEFAULT_AVATAR)
     };
 
-    if let Err(why) = ChannelId(805186168647974964).send_message(&ctx, |m| m
+    if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
             .title(format!("{} left Voice Channel", &name))
             .author(|a| a
@@ -57,7 +58,7 @@ async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceSta
         None => String::from(DEFAULT_AVATAR)
     };
 
-    if let Err(why) = ChannelId(805186168647974964).send_message(&ctx, |m| m
+    if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
             .title(format!("{} joined Voice Channel", &name))
             .author(|a| a
@@ -88,7 +89,7 @@ async fn moved_voice_channel(ctx: &Context, _guild_id: &GuildId, old: &Option<Vo
         None => "No channel name found".to_string()
     };
 
-    if let Err(why) = ChannelId(805186168647974964).send_message(ctx, |m| m
+    if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(ctx, |m| m
         .embed(|e| e
             .title(format!("{} moved {} -> {}", &name, old_channel_name, new_channel_name))
             .author(|a| a
