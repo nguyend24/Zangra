@@ -4,6 +4,7 @@ use serenity::model::voice::VoiceState;
 use crate::utils::voice::{VoiceStateChange, identify_state};
 use chrono::Utc;
 use chrono_tz::US::Eastern;
+use serenity::utils::Color;
 
 const LOG_CHANNEL_ID: u64 = 805186168647974964;
 
@@ -37,6 +38,7 @@ async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<Vo
 
     if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
+            .color(Color::RED)
             .title(format!("{} left Voice Channel", &name))
             .author(|a| a
                 .name(&name)
@@ -54,6 +56,7 @@ async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceSta
 
     if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
+            .color(Color::from_rgb(0, 255, 0)) //Green
             .title(format!("{} joined Voice Channel", &name))
             .author(|a| a
                 .name(&name)
@@ -82,6 +85,7 @@ async fn moved_voice_channel(ctx: &Context, _guild_id: &GuildId, old: &Option<Vo
 
     if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(ctx, |m| m
         .embed(|e| e
+            .color(Color::GOLD)
             .title(format!("{} moved {} -> {}", &name, old_channel_name, new_channel_name))
             .author(|a| a
                 .name(&name)
