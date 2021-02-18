@@ -5,7 +5,6 @@ use crate::utils::voice::{VoiceStateChange, identify_state};
 use chrono::Utc;
 use chrono_tz::US::Eastern;
 
-const DEFAULT_AVATAR: &str = "https://www.denofgeek.com/wp-content/uploads/2020/06/Discord.png";
 const LOG_CHANNEL_ID: u64 = 805186168647974964;
 
 pub async fn voice_state_changed(ctx: &Context, guild_id: &GuildId, old: &Option<VoiceState>, new: &VoiceState) {
@@ -34,10 +33,7 @@ pub async fn voice_state_changed(ctx: &Context, guild_id: &GuildId, old: &Option
 async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<VoiceState>, new: &VoiceState) {
     let member = new.member.as_ref().unwrap();
     let name: String = member.user.name.clone();
-    let icon_url: String = match member.user.avatar_url() {
-        Some(url) => url,
-        None => String::from(DEFAULT_AVATAR)
-    };
+    let icon_url: String = member.user.face();
 
     if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
@@ -54,10 +50,7 @@ async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<Vo
 async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceState) {
     let member = new.member.as_ref().unwrap();
     let name: String = member.user.name.clone();
-    let icon_url: String = match member.user.avatar_url() {
-        Some(url) => url,
-        None => String::from(DEFAULT_AVATAR)
-    };
+    let icon_url: String = member.user.face();
 
     if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
@@ -74,10 +67,7 @@ async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceSta
 async fn moved_voice_channel(ctx: &Context, _guild_id: &GuildId, old: &Option<VoiceState>, new: &VoiceState) {
     let member = new.member.as_ref().unwrap();
     let name: String = member.user.name.clone();
-    let icon_url: String = match member.user.avatar_url() {
-        Some(url) => url,
-        None => String::from(DEFAULT_AVATAR)
-    };
+    let icon_url: String = member.user.face();
 
     let old_channel_id = old.as_ref().unwrap().channel_id.as_ref().unwrap();
     let new_channel_id = new.channel_id.as_ref().unwrap();
