@@ -3,6 +3,7 @@ use serenity::model::id::{GuildId, ChannelId};
 use serenity::model::voice::VoiceState;
 use crate::utils::voice::{VoiceStateChange, identify_state};
 use chrono::Utc;
+use chrono_tz::US::Eastern;
 
 const DEFAULT_AVATAR: &str = "https://www.denofgeek.com/wp-content/uploads/2020/06/Discord.png";
 const LOG_CHANNEL_ID: u64 = 805186168647974964;
@@ -45,7 +46,7 @@ async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<Vo
                 .name(&name)
                 .icon_url(icon_url)
             )
-            .timestamp(Utc::now().to_rfc3339()))).await {
+            .field("Eastern Time", get_eastern_time(), false))).await {
         println!("Error sending BH left message. Why: {}", why);
     };
 }
@@ -65,7 +66,7 @@ async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceSta
                 .name(&name)
                 .icon_url(icon_url)
             )
-            .timestamp(Utc::now().to_rfc3339()))).await {
+            .field("Eastern Time", get_eastern_time(), false))).await {
         println!("Error sending BH join message. Why: {}", why);
     };
 }
@@ -95,7 +96,12 @@ async fn moved_voice_channel(ctx: &Context, _guild_id: &GuildId, old: &Option<Vo
             .author(|a| a
                 .name(&name)
                 .icon_url(icon_url))
-            .timestamp(Utc::now().to_rfc3339()))).await {
+            .field("Eastern Time", get_eastern_time(), false))).await {
         println!("Error sending BH move message. Why: {}", why);
     }
+}
+
+//Returns current in Eastern timezone as "YYYY-MM-DD HH:MM:SS AM/PM" 12 hour format
+fn get_eastern_time() -> String {
+    Utc::now().with_timezone(&Eastern).format("%F %r").to_string()
 }
