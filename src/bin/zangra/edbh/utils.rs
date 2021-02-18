@@ -31,15 +31,20 @@ pub async fn voice_state_changed(ctx: &Context, guild_id: &GuildId, old: &Option
     }
 }
 
-async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, _old: &Option<VoiceState>, new: &VoiceState) {
+async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, old: &Option<VoiceState>, new: &VoiceState) {
     let member = new.member.as_ref().unwrap();
     let name: String = member.user.name.clone();
     let icon_url: String = member.user.face();
 
+    let voice_channel_name = match old.as_ref().unwrap().channel_id.unwrap().name(ctx).await {
+        Some(channel_name) => channel_name,
+        None => "Channel name not found".to_string(),
+    };
+
     if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
             .color(Color::RED)
-            .title(format!("{} left Voice Channel", &name))
+            .title(format!("{} left {}", &name, voice_channel_name))
             .author(|a| a
                 .name(&name)
                 .icon_url(icon_url)
@@ -54,10 +59,15 @@ async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceSta
     let name: String = member.user.name.clone();
     let icon_url: String = member.user.face();
 
+    let voice_channel_name = match new.channel_id.unwrap().name(ctx).await {
+        Some(channel_name) => channel_name,
+        None => "Channel name not found".to_string(),
+    };
+
     if let Err(why) = ChannelId(LOG_CHANNEL_ID).send_message(&ctx, |m| m
         .embed(|e| e
             .color(Color::from_rgb(0, 255, 0)) //Green
-            .title(format!("{} joined Voice Channel", &name))
+            .title(format!("{} joined {}", &name, voice_channel_name))
             .author(|a| a
                 .name(&name)
                 .icon_url(icon_url)
