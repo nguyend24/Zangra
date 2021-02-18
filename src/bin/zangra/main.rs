@@ -15,7 +15,7 @@ use serenity::{
 
 use std::env;
 
-use commands::{math::*, ping::*, meta::*};
+use commands::{math::*, ping::*, meta::*, test::*};
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified, add_member_welcome_message};
 use std::fs::File;
@@ -27,8 +27,6 @@ use serde::{
 };
 use serenity::model::voice::VoiceState;
 
-
-
 mod commands;
 mod config;
 mod edbh;
@@ -39,8 +37,10 @@ mod utils;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const TEST_SERVER_ID: &u64 = &373993407741427713_u64;
+
 #[group]
-#[commands(ping, invis, online)]
+#[commands(ping, invis, online, timestamp)]
 struct General;
 
 #[group]
