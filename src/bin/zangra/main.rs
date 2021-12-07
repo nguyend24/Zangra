@@ -53,9 +53,8 @@ pub struct ConfigurationData {
 }
 
 fn read_configuration() -> ConfigurationData {
-    let empty_config = r#"
-    discord_token = ""
-    "#;
+    let empty_config =
+    r#"discord_token = """#;
 
     match File::open("config.toml") {
         Ok(mut file) => {
