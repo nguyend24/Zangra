@@ -1,6 +1,11 @@
 use serenity::{
     async_trait,
-    client::{Client, Context, EventHandler},
+    client::{
+        bridge::gateway::GatewayIntents,
+        Client,
+        Context,
+        EventHandler
+    },
     framework::{
         standard::macros::group,
         StandardFramework},
@@ -8,7 +13,9 @@ use serenity::{
         id::{ChannelId, GuildId},
         channel::Reaction,
         guild::Member,
-        gateway::Ready},
+        gateway::Ready,
+        voice::VoiceState,
+    },
 
     utils::Color,
 };
@@ -25,7 +32,8 @@ use serde::{
     Deserialize, // To deserialize data into structures
     Serialize,
 };
-use serenity::model::voice::VoiceState;
+
+use crate::utils::database::{DatabasePool, get_sqlite_pool};
 
 mod commands;
 mod config;
@@ -169,7 +177,7 @@ impl EventHandler for Handler {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
     let configuration = read_configuration();
 
     let discord_token = configuration.discord_token;
@@ -187,10 +195,19 @@ async fn main() {
     let mut client = Client::builder(discord_token)
         .event_handler(Handler)
         .framework(framework)
+        .intents(GatewayIntents::all())
         .await
         .expect("Error creating client");
+
+    {
+        let mut data = client.data.write().await;
+        let pool = get_sqlite_pool("sqlite://zangra.db").await?;
+        data.insert::<DatabasePool>(pool);
+    }
 
     if let Err(why) = client.start().await {
         println!("Client error: {:?}", why);
     }
+
+    Ok(())
 }

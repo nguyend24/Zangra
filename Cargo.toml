@@ -30,3 +30,7 @@ features = ["full"]
 [dependencies.serde]
 version = "1"
 features = ["derive"]
+
+[dependencies.sqlx]
+version = "0.5"
+features = ["sqlite", "runtime-async-std-native-tls", "macros", "sqlx-macros"]
