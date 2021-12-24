@@ -58,39 +58,22 @@ struct Math;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ConfigurationData {
     pub discord_token: String,
+    pub application_id: String,
 }
 
-fn read_configuration() -> ConfigurationData {
-    let empty_config =
-    r#"discord_token = """#;
-
+fn read_configuration() -> Option<ConfigurationData> {
     match File::open("config.toml") {
         Ok(mut file) => {
             let mut contents = String::new();
             file.read_to_string(&mut contents).unwrap();
             let configuration = toml::from_str::<ConfigurationData>(&contents).unwrap();
 
-            configuration
+            Some(configuration)
         }
 
         Err(why) => {
             println!("Unable to open config file. Why: {}", why);
-            match File::create("config.toml") {
-                Ok(mut empty_file) => {
-                    match empty_file.write(empty_config.as_bytes()) {
-                        Ok(_) => {}
-                        Err(_) => {}
-                    };
-                    let configuration = toml::from_str::<ConfigurationData>(&empty_config).unwrap();
-
-                    configuration
-                }
-
-                Err(why) => {
-                    println!("Unable to create empty config file: {}", why);
-                    panic!();
-                }
-            }
+            None
         }
     }
 }
@@ -178,9 +161,7 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
-    let configuration = read_configuration();
-
-    let discord_token = configuration.discord_token;
+    let configuration = read_configuration().unwrap();
 
     let framework = StandardFramework::new().configure(
         |c| c
@@ -192,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
         .group(&GENERAL_GROUP)
         .group(&MATH_GROUP);
 
-    let mut client = Client::builder(discord_token)
+    let mut client = Client::builder(configuration.discord_token)
         .event_handler(Handler)
         .framework(framework)
         .intents(GatewayIntents::all())
