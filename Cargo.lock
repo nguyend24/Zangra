@@ -9,6 +9,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "chrono-tz",
+ "itertools",
  "rand 0.7.3",
  "serde",
  "serde_json",

@@ -14,6 +14,7 @@ use serenity::{
         channel::Reaction,
         guild::Member,
         gateway::Ready,
+        interactions::Interaction,
         voice::VoiceState,
     },
 
@@ -22,7 +23,7 @@ use serenity::{
 
 use std::env;
 
-use commands::{math::*, ping::*, meta::*, test::*};
+use commands::{math::*, ping::*, messages::*, meta::*, test::*, };
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified, add_member_welcome_message};
 use std::fs::File;
@@ -86,6 +87,13 @@ impl EventHandler for Handler {
         if guild_id.as_u64() == &713889872359981076 {
             add_member_join_role(&ctx, &new_member).await;
             add_member_welcome_message(&ctx, &new_member).await;
+        }
+    }
+
+    async fn interaction_create(&self, _ctx: Context, _interaction: Interaction) {
+        if autorole_selections(&_ctx, _interaction).await {
+            println!("oekrgoekrg");
+            return;
         }
     }
 
@@ -177,6 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
         .event_handler(Handler)
         .framework(framework)
         .intents(GatewayIntents::all())
+        .application_id(configuration.application_id.parse().unwrap())
         .await
         .expect("Error creating client");
 
