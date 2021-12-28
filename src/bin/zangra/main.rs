@@ -23,7 +23,7 @@ use serenity::{
 
 use std::env;
 
-use commands::{math::*, ping::*, messages::*, meta::*, test::*, };
+use commands::{math::*, ping::*, messages::*, meta::*, test::*};
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified, add_member_welcome_message};
 use std::fs::File;
@@ -55,6 +55,10 @@ struct General;
 #[group]
 #[commands(multiply)]
 struct Math;
+
+#[group]
+#[commands(createroleselection)]
+struct Moderation;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ConfigurationData {
@@ -92,7 +96,6 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, _ctx: Context, _interaction: Interaction) {
         if autorole_selections(&_ctx, _interaction).await {
-            println!("oekrgoekrg");
             return;
         }
     }
@@ -179,7 +182,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
             .case_insensitivity(true)
     )
         .group(&GENERAL_GROUP)
-        .group(&MATH_GROUP);
+        .group(&MATH_GROUP)
+        .group(&MODERATION_GROUP);
 
     let mut client = Client::builder(configuration.discord_token)
         .event_handler(Handler)
