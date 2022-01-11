@@ -7,7 +7,7 @@ use std::cmp::min;
 use itertools::Itertools;
 use rand::distributions::{Distribution, Uniform};
 use serenity::{
-    builder::{CreateButton, CreateSelectMenu, CreateSelectMenuOption},
+    builder::{CreateActionRow, CreateEmbed, CreateSelectMenu, CreateSelectMenuOption},
     client::Context,
     collector::EventCollectorBuilder,
     framework::standard::{CommandResult, macros::command},
@@ -16,25 +16,17 @@ use serenity::{
         channel::Message,
         event::{Event, EventType},
         guild::{Emoji, Role},
-        id::{EmojiId, RoleId},
+        id::{ChannelId, EmojiId, GuildId, RoleId},
         interactions::{
             Interaction,
             InteractionResponseType,
-            message_component::{ButtonStyle},
+            message_component::{ActionRowComponent, ButtonStyle},
         },
     },
     utils::Color,
 };
-use serenity::builder::{CreateActionRow, CreateEmbed};
-use serenity::model::id::{ChannelId, GuildId, MessageId};
-use serenity::model::interactions::InteractionType;
-use serenity::model::interactions::message_component::ActionRowComponent;
-use serenity::model::prelude::InteractionApplicationCommandCallbackDataFlags;
-use serenity::model::prelude::message_component::{ComponentType, SelectMenu};
-use sqlx::Row;
 
 use crate::DatabasePool;
-
 
 fn random_color() -> Color {
     let mut rng = rand::thread_rng();
@@ -61,7 +53,7 @@ pub async fn autorole_selections(ctx: &Context, interaction: Interaction) -> boo
             .fetch_one(&pool)
             .await;
 
-    if let Ok(query) = query {
+    if let Ok(_query) = query {
         if let Some(ref mc) = interaction.message_component() {
             mc.create_interaction_response(&ctx, |re| {
                 re.kind(InteractionResponseType::DeferredUpdateMessage)
@@ -115,7 +107,6 @@ pub async fn autorole_selections(ctx: &Context, interaction: Interaction) -> boo
                     msg.clone().edit(&ctx, |m| {
                         m.content(msg.content.clone())
                     }).await.unwrap();
-
                 }
                 _ => {}
             }
@@ -145,7 +136,7 @@ pub async fn createroleselection(ctx: &Context, msg: &Message) -> CommandResult 
     Ok(())
 }
 
-async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, reference_message: Option<Message>) -> Option<RoleSelector> {
+async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, edit_message: Option<Message>) -> Option<RoleSelector> {
     let guild_roles: HashMap<RoleId, Role> = guild_id.roles(&ctx).await.expect("Error getting guild roles in createroleselection");
 
     //Send setup message
@@ -236,7 +227,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
 
 
     let mut setup_message: Message = channel_id.send_message(&ctx, |m| {
-        if let Some(msg) = reference_message {
+        if let Some(msg) = edit_message {
             m.reference_message(&msg);
         }
         m.set_embed(role_selection_prompt(&page_index, &selected_roles));
@@ -514,115 +505,6 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         action_rows: action_rows,
     };
     Some(role_selector)
-    // match setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
-    //     Some(mc) => {
-    //         match mc.data.custom_id.as_str() {
-    //             "yes" => {
-    //                 mc.create_interaction_response(&ctx, |re| {
-    //                     re.kind(InteractionResponseType::UpdateMessage);
-    //                     re.interaction_response_data(|d| {
-    //                         d.create_embed(|e| {
-    //                             e.title("Reply to me with the message");
-    //                             e.color(random_color())
-    //                         });
-    //                         d.components(|c| {
-    //                             c.set_action_rows(Vec::new())
-    //                         })
-    //                     })
-    //                 }).await.unwrap();
-    //                 let response = match await_message_reply(&ctx, setup_message.clone()).await {
-    //                     Ok(msg) => { msg }
-    //                     Err(why) => {
-    //                         "".parse().unwrap()
-    //                     }
-    //                 };
-    //
-    //                 setup_message.edit(&ctx, |edit| {//Display finished list and Done/Cancel buttons
-    //                     edit.content(response);
-    //                     edit.set_embeds(vec![]);
-    //                     edit.components(|c| { //done/dancel buttons
-    //                         c.create_action_row(|ar| {
-    //                             ar.create_button(|but| {
-    //                                 but.custom_id("done");
-    //                                 but.label("Done");
-    //                                 but.style(ButtonStyle::Primary)
-    //                             });
-    //                             ar.add_button(cancel_button.clone())
-    //                         });
-    //                         c.create_action_row(|ar| {
-    //                             ar.add_select_menu(select_menu.clone())
-    //                         })
-    //                     })
-    //                 }).await.unwrap();
-    //
-    //                 let mut interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
-    //                 let mut done = false;
-    //                 while !done {
-    //                     match interaction {
-    //                         Some(ref mc) => {
-    //                             mc.create_interaction_response(&ctx, |re| {
-    //                                 re.kind(InteractionResponseType::DeferredUpdateMessage)
-    //                             }).await.unwrap();
-    //                             match mc.data.custom_id.as_str() {
-    //                                 "done" => {
-    //                                     //remove buttons, set message and set list
-    //
-    //                                     setup_message.edit(&ctx, |m| {
-    //                                         m.components(|c| {
-    //                                             c.create_action_row(|ar| {
-    //                                                 ar.create_button(|b| {
-    //                                                     b.custom_id("clear_roles");
-    //                                                     b.label("Clear Roles");
-    //                                                     b.style(ButtonStyle::Primary)
-    //                                                 });
-    //                                                 ar.create_button(|b| {
-    //                                                     b.custom_id("edit");
-    //                                                     b.label("Edit");
-    //                                                     b.style(ButtonStyle::Primary)
-    //                                                 })
-    //                                             });
-    //                                             c.create_action_row(|ar| {
-    //                                                 ar.add_select_menu(select_menu.clone())
-    //                                             })
-    //                                         })
-    //                                     }).await.unwrap();
-    //                                     done = true;
-    //                                 }
-    //                                 "cancel" => {
-    //                                     setup_message.delete(&ctx).await.unwrap();
-    //                                     return None;
-    //                                 }
-    //                                 "selectmenu" => {}
-    //                                 _ => {}
-    //                             }
-    //                         }
-    //                         None => {}
-    //                     }
-    //
-    //                     interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
-    //                 }
-    //             }
-    //             "no" => {
-    //                 setup_message.edit(&ctx, |edit| {//Display finished list and Done/Cancel buttons
-    //                     edit.embed(|embed| { //Display finished list
-    //                         embed.color(random_color())
-    //                     });
-    //                     edit.components(|c| { //done/dancel buttons
-    //                         c.create_action_row(|ar| {
-    //                             ar.add_select_menu(select_menu.clone())
-    //                         })
-    //                     })
-    //                 }).await.unwrap();
-    //             }
-    //             "cancel" => {
-    //                 setup_message.delete(&ctx).await.unwrap();
-    //                 return None;
-    //             }
-    //             _ => {}
-    //         }
-    //     }
-    //     None => {}
-    // }
 }
 
 async fn await_message_reply(ctx: &Context, parent_message: Message) -> Result<String, String> {
