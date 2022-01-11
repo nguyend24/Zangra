@@ -192,7 +192,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         embed
     };
 
-    let role_selection_buttons_action_row = |page_index: &usize| {
+    let role_selection_buttons_action_row = |page_index: &usize, selected_roles: &Vec<RoleId>| {
         CreateActionRow::default()
             .create_button(|b| {
                 b.custom_id("previous_page");
@@ -215,7 +215,11 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             .create_button(|b| {
                 b.custom_id("continue");
                 b.label("Continue");
-                b.style(ButtonStyle::Primary)
+                b.style(ButtonStyle::Primary);
+                if selected_roles.len() == 0 {
+                    b.disabled(true);
+                }
+                b
             })
             .create_button(|b| {
                 b.custom_id("cancel");
@@ -232,7 +236,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         }
         m.set_embed(role_selection_prompt(&page_index, &selected_roles));
         m.components(|c| {
-            c.add_action_row(role_selection_buttons_action_row(&page_index));
+            c.add_action_row(role_selection_buttons_action_row(&page_index, &selected_roles));
             c.add_action_row(role_selection_menu(&guild_roles, &page_index, &list_max, &selected_roles))
         })
     }).await.expect("Error sending setup message in createroleselection");
@@ -291,7 +295,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             re.interaction_response_data(|d| {
                 d.embeds(vec![role_selection_prompt(&page_index, &selected_roles)]);
                 d.components(|c| {
-                    c.add_action_row(role_selection_buttons_action_row(&page_index));
+                    c.add_action_row(role_selection_buttons_action_row(&page_index, &selected_roles));
                     c.add_action_row(role_selection_menu(&guild_roles, &page_index, &list_max, &selected_roles))
                 })
             })
