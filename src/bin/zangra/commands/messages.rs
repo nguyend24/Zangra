@@ -4,7 +4,7 @@ use std::{
 };
 use std::cmp::min;
 
-use itertools::Itertools;
+use itertools::{enumerate, Itertools};
 use rand::distributions::{Distribution, Uniform};
 use serenity::{
     builder::{CreateActionRow, CreateEmbed, CreateSelectMenu, CreateSelectMenuOption},
@@ -554,7 +554,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                     sm.custom_id("max_selections");
                     sm.max_values(1);
                     sm.options(|o| {
-                        (1..26).for_each(|i| {
+                        (1..(selected_roles.len() + 1)).for_each(|i| {
                             o.create_option(|op| {
                                 op.value(i);
                                 op.label(i)
