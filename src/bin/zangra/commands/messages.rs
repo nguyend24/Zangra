@@ -646,21 +646,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         m.content(&response);
         m.set_embeds(vec![]);
         m.components(|c| {
-            c.create_action_row(|ar| {
-                ar.create_button(|b| {
-                    b.custom_id("clear_roles");
-                    b.label("Clear Roles");
-                    b.style(ButtonStyle::Primary)
-                });
-                ar.create_button(|b| {
-                    b.custom_id("edit");
-                    b.label("Edit");
-                    b.style(ButtonStyle::Primary)
-                })
-            });
-            c.create_action_row(|ar| {
-                ar.add_select_menu(select_menu(selected_roles))
-            })
+            c.set_action_rows(action_rows.clone())
         })
     }).await.unwrap();
 
