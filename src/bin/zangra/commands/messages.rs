@@ -674,6 +674,8 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
 }
 
 async fn await_message_reply(ctx: &Context, parent_message: Message) -> Result<String, String> {
+    let timeout = 60 * 5; //In seconds
+
     let event_builder = EventCollectorBuilder::new(&ctx)
         .add_event_type(EventType::MessageCreate)
         .add_channel_id(parent_message.channel_id)
@@ -688,7 +690,7 @@ async fn await_message_reply(ctx: &Context, parent_message: Message) -> Result<S
             }
             false
         })
-        .timeout(Duration::from_secs(60 * 10)).await;
+        .timeout(Duration::from_secs(timeout)).await;
 
     let mut msg: String = String::from("");
     //Reply containing message
