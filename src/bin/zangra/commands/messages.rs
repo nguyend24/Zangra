@@ -25,6 +25,8 @@ use serenity::{
     },
     utils::Color,
 };
+use serenity::model::prelude::application_command::ApplicationCommandInteraction;
+use serenity::model::prelude::InteractionApplicationCommandCallbackDataFlags;
 
 use crate::DatabasePool;
 
@@ -41,11 +43,11 @@ struct RoleSelector {
     action_rows: Vec<CreateActionRow>,
 }
 
-pub async fn autorole_selections(ctx: &Context, interaction: Interaction) -> bool {
+pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> bool {
     let data = ctx.data.read().await;
     let pool = data.get::<DatabasePool>().unwrap().clone();
 
-    let message_id = interaction.clone().message_component().unwrap().message.id();
+    let message_id = interaction.clone().message_component().unwrap().message.id;
 
     let query =
         sqlx::query("select AutoRoleMessageId from AutoRoleMessage where AutoRoleMessageId = ?")
@@ -54,12 +56,12 @@ pub async fn autorole_selections(ctx: &Context, interaction: Interaction) -> boo
             .await;
 
     if let Ok(_query) = query {
-        if let Some(ref mc) = interaction.message_component() {
+        if let Some(ref mc) = interaction.clone().message_component() {
             mc.create_interaction_response(&ctx, |re| {
                 re.kind(InteractionResponseType::DeferredUpdateMessage)
             }).await.expect("autorole_selections");
 
-            let mut msg = mc.message.clone().regular().unwrap();
+            let mut msg = mc.message.clone();
             let member = mc.member.clone().expect("Can't access member");
 
             match mc.data.custom_id.as_str() {
@@ -99,6 +101,13 @@ pub async fn autorole_selections(ctx: &Context, interaction: Interaction) -> boo
                         }).await.expect("Unable to edit original role selector message");
 
                         role_selector.setup_message.delete(&ctx).await.expect("Unable to delete role selector set up message")
+                    } else {
+                        if let Err(why) = mc.create_followup_message(&ctx, |m| {
+                            m.content("This function is only enabled for administrators.");
+                            m.flags(InteractionApplicationCommandCallbackDataFlags::EPHEMERAL)
+                        }).await {
+                            println!("Unable to create interaction follow up message: {}", why);
+                        }
                     }
                 }
                 "selectmenu" => {
@@ -136,13 +145,43 @@ pub async fn createroleselection(ctx: &Context, msg: &Message) -> CommandResult 
     Ok(())
 }
 
+pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommandInteraction) {
+    let guild_id = command.guild_id.unwrap();
+    let channel_id = command.channel_id;
+    // if let Some(role_selector) = role_selection_message_setup(ctx, msg.guild_id.unwrap().clone(), msg.channel_id.clone(), None).await {
+    //     let data = ctx.data.read().await;
+    //     let pool = data.get::<DatabasePool>().unwrap().clone();
+    //
+    //     let role_selector_msg = role_selector.setup_message;
+    //     sqlx::query("insert into AutoRoleMessage (AutoRoleMessageId) values (?)")
+    //         .bind(role_selector_msg.id.as_u64().clone() as i64)
+    //         .execute(&pool)
+    //         .await
+    //         .unwrap();
+    // }
+    if let Some(role_selector) = role_selection_message_setup(&ctx, guild_id.clone(), channel_id.clone(), None).await {
+        let data = ctx.data.read().await;
+            let pool = data.get::<DatabasePool>().unwrap().clone();
+
+            let role_selector_msg = role_selector.setup_message;
+            sqlx::query("insert into AutoRoleMessage (AutoRoleMessageId) values (?)")
+                .bind(role_selector_msg.id.as_u64().clone() as i64)
+                .execute(&pool)
+                .await
+                .unwrap();
+    }
+}
+
 async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, edit_message: Option<Message>) -> Option<RoleSelector> {
     let guild_roles: HashMap<RoleId, Role> = guild_id.roles(&ctx).await.expect("Error getting guild roles in createroleselection");
+    let guild_emojis: Vec<Emoji> = guild_id.emojis(&ctx).await.expect("Unable to retrieve the guild's emojis");
+    let mut selected_roles: Vec<RoleId> = Vec::new(); //Roles available for a user to choose from
+
 
     //Send setup message
     let mut page_index = 0;
     let list_max = 25;
-    let mut selected_roles: Vec<RoleId> = Vec::new();
+
 
     let role_selection_menu = |guild_roles: &HashMap<RoleId, Role>, page_index: &usize, list_max: &usize, selected_roles: &Vec<RoleId>| {
         CreateActionRow::default().create_select_menu(|sm| {
@@ -244,7 +283,16 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     let mut interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
 
     //while continue button is not pressed
+    //Select the roles that a user can choose from
     while let Some(ref mc) = interaction {
+        mc.create_interaction_response(&ctx, |re| {
+            re.kind(InteractionResponseType::DeferredUpdateMessage)
+        }).await.unwrap();
+
+        if mc.data.custom_id.as_str() == "continue" {
+            break;
+        }
+
         match mc.data.custom_id.as_str() {
             "previous_page" => {
                 //retreat the selection list, everything else stays the same
@@ -253,12 +301,6 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             "next_page" => {
                 //advance the selection list, everything else stays the same
                 page_index += 1;
-            }
-            "continue" => {
-                mc.create_interaction_response(&ctx, |re| {
-                    re.kind(InteractionResponseType::DeferredUpdateMessage)
-                }).await.unwrap();
-                break;
             }
             "cancel" => {
                 setup_message.delete(&ctx).await.expect("Error deleting setup message");
@@ -290,158 +332,188 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             _ => {}
         }
 
-        mc.create_interaction_response(&ctx, |re| {
-            re.kind(InteractionResponseType::UpdateMessage);
-            re.interaction_response_data(|d| {
-                d.embeds(vec![role_selection_prompt(&page_index, &selected_roles)]);
-                d.components(|c| {
-                    c.add_action_row(role_selection_buttons_action_row(&page_index, &selected_roles));
-                    c.add_action_row(role_selection_menu(&guild_roles, &page_index, &list_max, &selected_roles))
-                })
+        setup_message.edit(&ctx, |m| {
+            m.set_embed(role_selection_prompt(&page_index, &selected_roles));
+            m.components(|c| {
+                c.add_action_row(role_selection_buttons_action_row(&page_index, &selected_roles));
+                c.add_action_row(role_selection_menu(&guild_roles, &page_index, &list_max, &selected_roles))
             })
-        }).await.unwrap();
+        }).await.expect("Unable to edit message");
 
         interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
     }
 
-    let guild_emojis: HashMap<EmojiId, Emoji> = guild_id.to_guild_cached(ctx).await.unwrap().emojis;
-    let emoji_selection_buttons_action_row = |page_index: &usize| {
-        CreateActionRow::default()
-            .create_button(|b| {
-                b.custom_id("previous_page");
-                b.label("Previous Page");
-                b.style(ButtonStyle::Primary);
-                if page_index == &0 {
-                    b.disabled(true);
-                }
-                b
-            })
-            .create_button(|b| {
-                b.custom_id("next_page");
-                b.label("Next Page");
-                b.style(ButtonStyle::Primary);
-                if (page_index + 1) * list_max > guild_emojis.len() {
-                    b.disabled(true);
-                }
-                b
-            })
-            .create_button(|b| {
-                b.custom_id("cancel");
-                b.label("Cancel");
-                b.style(ButtonStyle::Danger)
-            })
-            .clone()
-    };
 
-    let mut page_index = 0;
-    let emojis_select_menu = |page_index: &usize| {
-        CreateActionRow::default().create_select_menu(|sm| {
-            let mut list_length = 0;
-            sm
-                .custom_id("select_emoji")
-                .placeholder("Select emoji")
-                .min_values(1)
-                .max_values(1)
-                .options(|ops| { //List all roles available in guild
-                    let options: Vec<CreateSelectMenuOption> = guild_emojis
-                        .iter()
-                        .skip(page_index * list_max)
-                        .take(25)
-                        .map(|(emojiid, emoji)| {
-                            CreateSelectMenuOption::default()
-                                .label(emoji.name.as_str())
-                                .value(emoji.id.as_u64())
-                                .emoji(emojiid.clone().into())
-                                .to_owned()
-                        }).collect();
-                    list_length = options.len();
-                    ops.set_options(options)
+
+    // setup_message.edit(&ctx, |m| {
+    //     m.embed(|e| {
+    //         e.title("Add emoji to selections?")
+    //     });
+    //     m.components(|c| {
+    //         c.create_action_row(|ar| {
+    //             ar.add_select_menu(select_menu)
+    //         })
+    //     })
+    // })
+
+    // let guild_emojis: HashMap<EmojiId, Emoji> = guild_id.to_guild_cached(ctx).await.unwrap().emojis;
+    // let emoji_selection_buttons_action_row = |page_index: &usize| {
+    //     CreateActionRow::default()
+    //         .create_button(|b| {
+    //             b.custom_id("previous_page");
+    //             b.label("Previous Page");
+    //             b.style(ButtonStyle::Primary);
+    //             if page_index == &0 {
+    //                 b.disabled(true);
+    //             }
+    //             b
+    //         })
+    //         .create_button(|b| {
+    //             b.custom_id("next_page");
+    //             b.label("Next Page");
+    //             b.style(ButtonStyle::Primary);
+    //             if (page_index + 1) * list_max > guild_emojis.len() {
+    //                 b.disabled(true);
+    //             }
+    //             b
+    //         })
+    //         .create_button(|b| {
+    //             b.custom_id("cancel");
+    //             b.label("Cancel");
+    //             b.style(ButtonStyle::Danger)
+    //         })
+    //         .clone()
+    // };
+    //
+    // let mut page_index = 0;
+    // let emojis_select_menu = |page_index: &usize| {
+    //     CreateActionRow::default().create_select_menu(|sm| {
+    //         let mut list_length = 0;
+    //         sm
+    //             .custom_id("select_emoji")
+    //             .placeholder("Select emoji")
+    //             .min_values(1)
+    //             .max_values(1)
+    //             .options(|ops| { //List all roles available in guild
+    //                 let options: Vec<CreateSelectMenuOption> = guild_emojis
+    //                     .iter()
+    //                     .skip(page_index * list_max)
+    //                     .take(25)
+    //                     .map(|(emojiid, emoji)| {
+    //                         CreateSelectMenuOption::default()
+    //                             .label(emoji.name.as_str())
+    //                             .value(emoji.id.as_u64())
+    //                             .emoji(emojiid.clone().into())
+    //                             .to_owned()
+    //                     }).collect();
+    //                 list_length = options.len();
+    //                 ops.set_options(options)
+    //             })
+    //     })
+    //         .clone()
+    // };
+    //
+    // let mut roles_and_emojis: HashMap<RoleId, EmojiId> = HashMap::new();
+    // for roleid in &selected_roles {
+    //     let emoji_selection_embed = |page_index: &usize| {
+    //         let mut embed = CreateEmbed::default();
+    //         embed.title(format!("Pick an emoji to represent this role: *{}*", guild_roles.get(&roleid).unwrap().name));
+    //         embed.color(random_color());
+    //         embed.footer(|f| {
+    //             f.text(format!("Page {}/{}", page_index + 1, (guild_emojis.len() / list_max) + 1))
+    //         });
+    //         embed
+    //     };
+    //
+    //     setup_message.edit(&ctx, |m| {
+    //         m.set_embed(emoji_selection_embed(&page_index));
+    //         m.components(|c| {
+    //             c.add_action_row(emoji_selection_buttons_action_row(&page_index));
+    //             c.add_action_row(emojis_select_menu(&page_index))
+    //         })
+    //     }).await.unwrap(); //error handle this later
+    //
+    //
+    //     let mut done = false;
+    //     while !done {
+    //         match setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
+    //             Some(mc) => {
+    //                 match mc.data.custom_id.as_str() {
+    //                     "previous_page" => {
+    //                         page_index -= 1;
+    //                     }
+    //                     "next_page" => {
+    //                         page_index += 1;
+    //                     }
+    //                     "cancel" => {
+    //                         setup_message.delete(&ctx).await.unwrap();
+    //                         return None;
+    //                     }
+    //                     "select_emoji" => {
+    //                         let emoji_id = EmojiId(mc.data.values.first().unwrap().parse().unwrap());
+    //                         roles_and_emojis.insert(roleid.clone(), emoji_id);
+    //                         done = true;
+    //                     }
+    //                     _ => {}
+    //                 }
+    //
+    //                 mc.create_interaction_response(&ctx, |re| {
+    //                     re.kind(InteractionResponseType::UpdateMessage);
+    //                     re.interaction_response_data(|d| {
+    //                         d.embeds(vec![emoji_selection_embed(&page_index)]);
+    //                         d.components(|c| {
+    //                             c.add_action_row(emoji_selection_buttons_action_row(&page_index));
+    //                             c.add_action_row(emojis_select_menu(&page_index))
+    //                         })
+    //                     })
+    //                 }).await.unwrap();
+    //             }
+    //             None => {}
+    //         }
+    //     }
+    // }
+
+
+
+    //Set the max number of selections a user can make
+    setup_message.edit(&ctx, |m| {
+        m.embed(|e| {
+            e.title("What is the maximum number of selections a user can make?")
+        });
+        m.components(|c| {
+            c.create_action_row(|ar| {
+                ar.create_select_menu(|sm| {
+                    sm.placeholder("Pick a number");
+                    sm.custom_id("max_selections");
+                    sm.max_values(1);
+                    sm.options(|o| {
+                        (1..26).for_each(|i| {
+                            o.create_option(|op| {
+                                op.value(i);
+                                op.label(i)
+                            });
+                        });
+                        o
+                    })
                 })
-        })
-            .clone()
-    };
-
-    let mut roles_and_emojis: HashMap<RoleId, EmojiId> = HashMap::new();
-    for roleid in &selected_roles {
-        let emoji_selection_embed = |page_index: &usize| {
-            let mut embed = CreateEmbed::default();
-            embed.title(format!("Pick an emoji to represent this role: *{}*", guild_roles.get(&roleid).unwrap().name));
-            embed.color(random_color());
-            embed.footer(|f| {
-                f.text(format!("Page {}/{}", page_index + 1, (guild_emojis.len() / list_max) + 1))
-            });
-            embed
-        };
-
-        setup_message.edit(&ctx, |m| {
-            m.set_embed(emoji_selection_embed(&page_index));
-            m.components(|c| {
-                c.add_action_row(emoji_selection_buttons_action_row(&page_index));
-                c.add_action_row(emojis_select_menu(&page_index))
             })
-        }).await.unwrap(); //error handle this later
+        })
+    }).await.expect("Unable to send max_selection_prompt");
 
 
-        let mut done = false;
-        while !done {
-            match setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
-                Some(mc) => {
-                    match mc.data.custom_id.as_str() {
-                        "previous_page" => {
-                            page_index -= 1;
-                        }
-                        "next_page" => {
-                            page_index += 1;
-                        }
-                        "cancel" => {
-                            setup_message.delete(&ctx).await.unwrap();
-                            return None;
-                        }
-                        "select_emoji" => {
-                            let emoji_id = EmojiId(mc.data.values.first().unwrap().parse().unwrap());
-                            roles_and_emojis.insert(roleid.clone(), emoji_id);
-                            done = true;
-                        }
-                        _ => {}
-                    }
-
-                    mc.create_interaction_response(&ctx, |re| {
-                        re.kind(InteractionResponseType::UpdateMessage);
-                        re.interaction_response_data(|d| {
-                            d.embeds(vec![emoji_selection_embed(&page_index)]);
-                            d.components(|c| {
-                                c.add_action_row(emoji_selection_buttons_action_row(&page_index));
-                                c.add_action_row(emojis_select_menu(&page_index))
-                            })
-                        })
-                    }).await.unwrap();
-                }
-                None => {}
-            }
+    let mut max_selection = 0;
+    match setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(10 * 60)).await {
+        Some(mc) => {
+            mc.create_interaction_response(ctx, |re| {
+                re.kind(InteractionResponseType::DeferredUpdateMessage)
+            }).await.expect("Unable to create reaction response");
+            max_selection = mc.data.values[0].parse().unwrap();
         }
+        None => {}
     }
 
-//add a message to role select message
 
-    let select_menu = {
-        let mut sm = CreateSelectMenu::default();
-        sm.custom_id("selectmenu");
-        sm.min_values(1);
-        sm.max_values(roles_and_emojis.len() as u64);
-        sm.options(|ops| {
-            let options: Vec<CreateSelectMenuOption> = selected_roles.iter().map(|rid| {
-                let mut o = CreateSelectMenuOption::default();
-                let role_name = guild_roles.get(rid).unwrap().name.as_str();
-                let emoji_id = roles_and_emojis.get(rid).unwrap();
-                o.label(role_name);
-                o.value(rid);
-                o.emoji(emoji_id.clone().into());
-                o
-            }).collect();
-            ops.set_options(options)
-        });
-        sm
-    };
+//add a message to role select message
 
     setup_message.edit(&ctx, |m| {
         m.embed(|e| {
@@ -459,6 +531,26 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         }
     };
 
+    let select_menu = {
+        let mut sm = CreateSelectMenu::default();
+        sm.custom_id("selectmenu");
+        sm.min_values(1);
+        sm.max_values(max_selection);
+        sm.options(|ops| {
+            let options: Vec<CreateSelectMenuOption> = selected_roles.iter().map(|rid| {
+                let mut o = CreateSelectMenuOption::default();
+                let role_name = guild_roles.get(rid).unwrap().name.as_str();
+                // let emoji_id = roles_and_emojis.get(rid).unwrap();
+                o.label(role_name);
+                o.value(rid);
+                // o.emoji(emoji_id.clone().into());
+                o
+            }).collect();
+            ops.set_options(options)
+        });
+        sm
+    };
+
     let mut action_rows: Vec<CreateActionRow> = Vec::new();
 
     let buttons = CreateActionRow::default()
@@ -470,7 +562,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         .create_button(|b| {
             b.custom_id("edit");
             b.label("Edit");
-            b.style(ButtonStyle::Primary)
+            b.style(ButtonStyle::Secondary)
         })
         .clone();
     let selection_menu = CreateActionRow::default()

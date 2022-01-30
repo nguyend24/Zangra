@@ -33,6 +33,11 @@ use serde::{
     Deserialize, // To deserialize data into structures
     Serialize,
 };
+use serenity::builder::CreateActionRow;
+use serenity::model::id::CommandId;
+use serenity::model::interactions::application_command::ApplicationCommand;
+use serenity::model::interactions::InteractionResponseType;
+use serenity::model::interactions::message_component::ButtonStyle;
 
 use crate::utils::database::{DatabasePool, get_sqlite_pool};
 
@@ -94,8 +99,28 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn interaction_create(&self, _ctx: Context, _interaction: Interaction) {
-        if autorole_selections(&_ctx, _interaction).await {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = &interaction {
+            if let Err(why) = command.create_interaction_response(&ctx, |re| {
+                re.kind(InteractionResponseType::DeferredChannelMessageWithSource)
+            }).await {
+                println!("Cannot respond to slash command: {}", why);
+            };
+
+            match command.data.name.as_str() {
+                "createroleselector" => {
+                    let cid = command.data.id;
+                    println!("{}", cid);
+                    command.get_interaction_response(&ctx).await.unwrap().delete(&ctx).await;
+                    createroleselectorslash(&ctx, &command).await;
+
+                }
+
+                _ => {}
+            }
+        }
+
+        if autorole_selections(&ctx, &interaction).await {
             return;
         }
     }
@@ -123,6 +148,13 @@ impl EventHandler for Handler {
                 )
         }).await {
             println!("{}", why)
+        };
+
+        if let Err(why) =  ApplicationCommand::create_global_application_command(&ctx, |command| {
+            command.name("createroleselector");
+            command.description("Create a role selector prompt for users to choose their roles")
+        }).await {
+            println!("Unable to create slash command: {}", why);
         };
     }
 
