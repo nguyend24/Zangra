@@ -161,14 +161,14 @@ pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommand
     // }
     if let Some(role_selector) = role_selection_message_setup(&ctx, guild_id.clone(), channel_id.clone(), None).await {
         let data = ctx.data.read().await;
-            let pool = data.get::<DatabasePool>().unwrap().clone();
+        let pool = data.get::<DatabasePool>().unwrap().clone();
 
-            let role_selector_msg = role_selector.setup_message;
-            sqlx::query("insert into AutoRoleMessage (AutoRoleMessageId) values (?)")
-                .bind(role_selector_msg.id.as_u64().clone() as i64)
-                .execute(&pool)
-                .await
-                .unwrap();
+        let role_selector_msg = role_selector.setup_message;
+        sqlx::query("insert into AutoRoleMessage (AutoRoleMessageId) values (?)")
+            .bind(role_selector_msg.id.as_u64().clone() as i64)
+            .execute(&pool)
+            .await
+            .unwrap();
     }
 }
 
@@ -344,7 +344,6 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     }
 
 
-
     // setup_message.edit(&ctx, |m| {
     //     m.embed(|e| {
     //         e.title("Add emoji to selections?")
@@ -472,8 +471,76 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     //         }
     //     }
     // }
+    setup_message.edit(&ctx, |m| {
+        m.embed(|e| {
+            e.title("Add descriptions to selections?")
+        });
+        m.components(|c| {
+            c.create_action_row(|ar| {
+                ar.create_button(|b| {
+                    b.custom_id("yes");
+                    b.label("Yes");
+                    b.style(ButtonStyle::Primary)
+                });
+                ar.create_button(|b| {
+                    b.custom_id("no");
+                    b.label("No");
+                    b.style(ButtonStyle::Primary)
+                });
+                ar.create_button(|b| {
+                    b.custom_id("cancel");
+                    b.label("Cancel");
+                    b.style(ButtonStyle::Danger)
+                })
+            })
+        })
+    }).await.expect("Unable to edit message");
 
+    let mut role_descriptions: HashMap<RoleId, String> = HashMap::new();
 
+    match setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
+        Some(mc) => {
+            mc.create_interaction_response(&ctx, |re| {
+                re.kind(InteractionResponseType::DeferredUpdateMessage)
+            }).await.expect("Unable to send interaction response");
+
+            match mc.data.custom_id.as_str() {
+                "yes" => {
+                    //for each role, ask for a reply with the description to set
+                    for roleid in &selected_roles {
+                        let role = guild_roles.get(&roleid).expect("Unable to map RoleId to Role");
+                        setup_message.edit(&ctx, |m| {
+                            m.embed(|e| {
+                                e.title(format!("Reply with a description for the role: {}", role.name.as_str()))
+                            });
+                            m.components(|c| {
+                                c.set_action_rows(vec!())
+                            })
+                        }).await.expect("Unable to edit message");
+
+                        let description = await_message_reply(&ctx, setup_message.clone())
+                            .await
+                            .expect("Unable to get a description response");
+
+                        role_descriptions.insert(roleid.clone(), description);
+                    }
+                }
+                "no" => {}
+                "cancel" => {
+                    setup_message.delete(&ctx).await.expect("Unable to delete message");
+                    return None;
+                }
+                _ => {
+                    //should not happen
+                    println!("Unknown custom_id: {}, line: {}", mc.data.custom_id.as_str(), line!());
+                }
+            }
+        }
+        None => {
+            //delete message and error out
+            //TODO
+        }
+    }
 
     //Set the max number of selections a user can make
     setup_message.edit(&ctx, |m| {
@@ -531,7 +598,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         }
     };
 
-    let select_menu = {
+    let select_menu = |selected_roles: Vec<RoleId>|{
         let mut sm = CreateSelectMenu::default();
         sm.custom_id("selectmenu");
         sm.min_values(1);
@@ -544,6 +611,9 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                 o.label(role_name);
                 o.value(rid);
                 // o.emoji(emoji_id.clone().into());
+                if role_descriptions.len() == selected_roles.len() {
+                    o.description(&role_descriptions.get(rid).unwrap());
+                }
                 o
             }).collect();
             ops.set_options(options)
@@ -566,7 +636,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         })
         .clone();
     let selection_menu = CreateActionRow::default()
-        .add_select_menu(select_menu.clone())
+        .add_select_menu(select_menu(selected_roles.clone()))
         .clone();
 
     action_rows.push(buttons);
@@ -589,7 +659,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                 })
             });
             c.create_action_row(|ar| {
-                ar.add_select_menu(select_menu.clone())
+                ar.add_select_menu(select_menu(selected_roles))
             })
         })
     }).await.unwrap();
