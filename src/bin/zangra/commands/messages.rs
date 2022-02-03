@@ -3,9 +3,13 @@ use std::{
     time::Duration,
 };
 use std::cmp::min;
+use std::str::FromStr;
 
 use itertools::{enumerate, Itertools};
 use rand::distributions::{Distribution, Uniform};
+use serde::de::Error;
+
+use serde_json::{json, Value};
 use serenity::{
     builder::{CreateActionRow, CreateEmbed, CreateSelectMenu, CreateSelectMenuOption},
     client::Context,
@@ -25,6 +29,8 @@ use serenity::{
     },
     utils::Color,
 };
+use serenity::model::channel::{Embed, MessageFlags, MessageReference};
+use serenity::model::guild::Target::Channel;
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;
 use serenity::model::prelude::InteractionApplicationCommandCallbackDataFlags;
 
@@ -170,6 +176,10 @@ pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommand
             .await
             .unwrap();
     }
+}
+async fn test() -> Result<(), Box<dyn Error>> {
+    let okoaskda = serde_json::from_str("oaksdokaowdk")?;
+    Ok(())
 }
 
 async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, edit_message: Option<Message>) -> Option<RoleSelector> {
@@ -580,25 +590,140 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     }
 
 
-//add a message to role select message
+    //add a message to role select message
+    //display selected roles,
+    //buttons for
+    //set message, add embed, done, cancel
 
     setup_message.edit(&ctx, |m| {
         m.embed(|e| {
-            e.description("Reply to me with instructions for this role selection")
+            e.title("Set a message or embeds?");
+            e.description("This embed will be deleted once setup is complete.")
         });
         m.components(|c| {
-            c.set_action_rows(vec![])
+            c.create_action_row(|ar| {
+                ar.create_button(|b| {
+                    b.custom_id("set_message");
+                    b.label("Set Message");
+                    b.style(ButtonStyle::Primary)
+                });
+                ar.create_button(|b| {
+                    b.custom_id("add_embed");
+                    b.label("Add Embed");
+                    b.style(ButtonStyle::Primary)
+                });
+                ar.create_button(|b| {
+                    b.custom_id("done");
+                    b.label("Done");
+                    b.style(ButtonStyle::Primary)
+                });
+                ar.create_button(|b| {
+                    b.custom_id("cancel");
+                    b.label("Cancel");
+                    b.style(ButtonStyle::Danger)
+                })
+            })
         })
-    }).await.unwrap();
+    }).await.expect("Unable to edit message");
 
-    let response = match await_message_reply(&ctx, setup_message.clone()).await {
-        Ok(msg) => { msg }
-        Err(_why) => {
-            "Select your roles!".parse().unwrap()
+
+    let mut instructions_message = String::from("");
+    let mut embeds: Vec<CreateEmbed> = Vec::new();
+
+    while let Some(mc) =
+    setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
+        mc.create_interaction_response(&ctx, |re| {
+            re.kind(InteractionResponseType::DeferredUpdateMessage)
+        }).await.expect("Unable to send interaction response");
+
+        match mc.data.custom_id.as_str() {
+            "set_message" => {
+                setup_message.edit(&ctx, |m| {
+                    m.content("");
+                    m.embed(|e| {
+                        e.title("Reply to me with the message")
+                    });
+                    m.components(|c| {
+                        c.set_action_rows(vec!())
+                    })
+                }).await.expect("Unable to edit message");
+
+                instructions_message = await_message_reply(&ctx, setup_message.clone()).await.expect("Unable to get a response");
+            }
+            "add_embed" => {
+                setup_message.edit(&ctx, |m| {
+                    m.embed(|e| {
+                        e.title("Reply with json representing the embed")
+                    });
+                    m.components(|c| {
+                        c.set_action_rows(vec!())
+                    })
+                }).await.expect("Unable to edit message");
+
+                let response = await_message_reply(&ctx, setup_message.clone()).await.expect("Unable to receive reply");
+                let mut json: serde_json::Result<HashMap<String, Value>> = serde_json::from_str(&response);
+                match json {
+                    Ok(mut json) => {
+                        json.insert(String::from("type"), json!("rich"));
+                        let embed: Embed = serde_json::from_str(serde_json::to_string(&json).unwrap().as_str()).expect("Unable to deserialize");
+                        let mut embed = CreateEmbed::from(embed);
+
+                        embeds.push(embed)}
+                    Err(why) => {
+                        setup_message.channel_id.send_message(&ctx, |m| {
+                            m.reference_message(MessageReference::from(&setup_message));
+                            m.flags(MessageFlags::EPHEMERAL);
+                            m.content("Invalid JSON")
+                        }).await;
+                        println!("{}", why);
+                    }
+                }
+
+            }
+            "done" => { break; }
+            "cancel" => {
+                setup_message.delete(&ctx).await.expect("Unable to delete message");
+                return None;
+            }
+            _ => {}
         }
-    };
 
-    let select_menu = |selected_roles: Vec<RoleId>|{
+        setup_message.edit(&ctx, |m| {
+            m.content(&instructions_message);
+            m.set_embeds(vec!());
+            m.add_embed(|e| {
+                e.title("Set a message or embeds?");
+                e.description("This embed will be deleted once setup is complete.")
+            });
+            m.add_embeds(embeds.clone());
+            m.components(|c| {
+                c.create_action_row(|ar| {
+                    ar.create_button(|b| {
+                        b.custom_id("set_message");
+                        b.label("Set Message");
+                        b.style(ButtonStyle::Primary)
+                    });
+                    ar.create_button(|b| {
+                        b.custom_id("add_embed");
+                        b.label("Add Embed");
+                        b.style(ButtonStyle::Primary)
+                    });
+                    ar.create_button(|b| {
+                        b.custom_id("done");
+                        b.label("Done");
+                        b.style(ButtonStyle::Primary)
+                    });
+                    ar.create_button(|b| {
+                        b.custom_id("cancel");
+                        b.label("Cancel");
+                        b.style(ButtonStyle::Danger)
+                    })
+                })
+            })
+        }).await.expect("Unable to edit message");
+    }
+
+    let select_menu = |selected_roles: Vec<RoleId>| {
         let mut sm = CreateSelectMenu::default();
         sm.custom_id("selectmenu");
         sm.min_values(1);
@@ -643,8 +768,8 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     action_rows.push(selection_menu);
 
     setup_message.edit(&ctx, |m| {
-        m.content(&response);
-        m.set_embeds(vec![]);
+        m.content(&instructions_message);
+        m.set_embeds(embeds.clone());
         m.components(|c| {
             c.set_action_rows(action_rows.clone())
         })
@@ -652,8 +777,8 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
 
     let role_selector = RoleSelector {
         setup_message: setup_message,
-        content: response,
-        embeds: vec![],
+        content: instructions_message,
+        embeds: embeds,
         action_rows: action_rows,
     };
     Some(role_selector)
