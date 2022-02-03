@@ -177,10 +177,6 @@ pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommand
             .unwrap();
     }
 }
-async fn test() -> Result<(), Box<dyn Error>> {
-    let okoaskda = serde_json::from_str("oaksdokaowdk")?;
-    Ok(())
-}
 
 async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, edit_message: Option<Message>) -> Option<RoleSelector> {
     let guild_roles: HashMap<RoleId, Role> = guild_id.roles(&ctx).await.expect("Error getting guild roles in createroleselection");
@@ -764,8 +760,8 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         .add_select_menu(select_menu(selected_roles.clone()))
         .clone();
 
-    action_rows.push(buttons);
     action_rows.push(selection_menu);
+    action_rows.push(buttons);
 
     setup_message.edit(&ctx, |m| {
         m.content(&instructions_message);
