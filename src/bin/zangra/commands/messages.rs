@@ -176,8 +176,8 @@ pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommand
 }
 
 async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, edit_message: Option<Message>) -> Result<RoleSelector> {
-    let guild_roles: HashMap<RoleId, Role> = guild_id.roles(&ctx).await.expect("Error getting guild roles in createroleselection");
-    let guild_emojis: Vec<Emoji> = guild_id.emojis(&ctx).await.expect("Unable to retrieve the guild's emojis");
+    let guild_roles: HashMap<RoleId, Role> = guild_id.roles(&ctx).await?;
+    let guild_emojis: Vec<Emoji> = guild_id.emojis(&ctx).await?;
     let mut selected_roles: Vec<RoleId> = Vec::new(); //Roles available for a user to choose from
 
 
@@ -281,7 +281,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             c.add_action_row(role_selection_buttons_action_row(&page_index, &selected_roles));
             c.add_action_row(role_selection_menu(&guild_roles, &page_index, &list_max, &selected_roles))
         })
-    }).await.expect("Error sending setup message in createroleselection");
+    }).await?;
 
     loop {
         let interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
@@ -370,7 +370,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                 })
             })
         })
-    }).await.expect("Unable to edit message");
+    }).await?;
 
     let mut role_descriptions: HashMap<RoleId, String> = HashMap::new();
 
@@ -378,7 +378,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         Some(mc) => {
             mc.create_interaction_response(&ctx, |re| {
                 re.kind(InteractionResponseType::DeferredUpdateMessage)
-            }).await.expect("Unable to send interaction response");
+            }).await?;
 
             match mc.data.custom_id.as_str() {
                 "yes" => {
@@ -392,7 +392,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                             m.components(|c| {
                                 c.set_action_rows(vec!())
                             })
-                        }).await.expect("Unable to edit message");
+                        }).await?;
 
                         let description = await_message_reply(&ctx, setup_message.clone())
                             .await
@@ -403,7 +403,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                 }
                 "no" => {}
                 "cancel" => {
-                    setup_message.delete(&ctx).await.expect("Unable to delete message");
+                    setup_message.delete(&ctx).await?;
                     return Err(Error::Zangra(ZangraError::new("cancel")));
                 }
                 _ => {
@@ -441,7 +441,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                 })
             })
         })
-    }).await.expect("Unable to send max_selection_prompt");
+    }).await?;
 
 
     let mut max_selection = 0;
@@ -449,7 +449,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         Some(mc) => {
             mc.create_interaction_response(ctx, |re| {
                 re.kind(InteractionResponseType::DeferredUpdateMessage)
-            }).await.expect("Unable to create reaction response");
+            }).await?;
             max_selection = mc.data.values[0].parse().unwrap();
         }
         None => {}
@@ -461,107 +461,15 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     //buttons for
     //set message, add embed, done, cancel
 
-    setup_message.edit(&ctx, |m| {
-        m.embed(|e| {
-            e.title("Set a message or embeds?");
-            e.description("This embed will be deleted once setup is complete.")
-        });
-        m.components(|c| {
-            c.create_action_row(|ar| {
-                ar.create_button(|b| {
-                    b.custom_id("set_message");
-                    b.label("Set Message");
-                    b.style(ButtonStyle::Primary)
-                });
-                ar.create_button(|b| {
-                    b.custom_id("add_embed");
-                    b.label("Add Embed");
-                    b.style(ButtonStyle::Primary)
-                });
-                ar.create_button(|b| {
-                    b.custom_id("done");
-                    b.label("Done");
-                    b.style(ButtonStyle::Primary)
-                });
-                ar.create_button(|b| {
-                    b.custom_id("cancel");
-                    b.label("Cancel");
-                    b.style(ButtonStyle::Danger)
-                })
-            })
-        })
-    }).await.expect("Unable to edit message");
-
-
     let mut instructions_message = String::from("");
     let mut embeds: Vec<CreateEmbed> = Vec::new();
 
-    while let Some(mc) =
-    setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
-        mc.create_interaction_response(&ctx, |re| {
-            re.kind(InteractionResponseType::DeferredUpdateMessage)
-        }).await.expect("Unable to send interaction response");
-
-        match mc.data.custom_id.as_str() {
-            "set_message" => {
-                setup_message.edit(&ctx, |m| {
-                    m.content("");
-                    m.embed(|e| {
-                        e.title("Reply to me with the message")
-                    });
-                    m.components(|c| {
-                        c.set_action_rows(vec!())
-                    })
-                }).await.expect("Unable to edit message");
-
-                instructions_message = await_message_reply(&ctx, setup_message.clone()).await.expect("Unable to get a response");
-            }
-            "add_embed" => {
-                setup_message.edit(&ctx, |m| {
-                    m.embed(|e| {
-                        e.title("Reply with json representing the embed")
-                    });
-                    m.components(|c| {
-                        c.set_action_rows(vec!())
-                    })
-                }).await.expect("Unable to edit message");
-
-                let response = await_message_reply(&ctx, setup_message.clone()).await.expect("Unable to receive reply");
-                let mut json: serde_json::Result<HashMap<String, Value>> = serde_json::from_str(&response);
-                match json {
-                    Ok(mut json) => {
-                        json.insert(String::from("type"), json!("rich"));
-                        let embed: Embed = serde_json::from_str(serde_json::to_string(&json).unwrap().as_str()).expect("Unable to deserialize");
-                        let mut embed = CreateEmbed::from(embed);
-
-                        embeds.push(embed)}
-                    Err(why) => {
-                        setup_message.channel_id.send_message(&ctx, |m| {
-                            m.reference_message(MessageReference::from(&setup_message));
-                            m.flags(MessageFlags::EPHEMERAL);
-                            m.content("Invalid JSON")
-                        }).await;
-                        println!("{}", why);
-                    }
-                }
-
-            }
-            "done" => { break; }
-            "cancel" => {
-                setup_message.delete(&ctx).await.expect("Unable to delete message");
-                return Err(Error::Zangra(ZangraError::new("cancel")));
-            }
-            _ => {}
-        }
-
+    loop {
         setup_message.edit(&ctx, |m| {
-            m.content(&instructions_message);
-            m.set_embeds(vec!());
-            m.add_embed(|e| {
+            m.embed(|e| {
                 e.title("Set a message or embeds?");
                 e.description("This embed will be deleted once setup is complete.")
             });
-            m.add_embeds(embeds.clone());
             m.components(|c| {
                 c.create_action_row(|ar| {
                     ar.create_button(|b| {
@@ -586,7 +494,68 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                     })
                 })
             })
-        }).await.expect("Unable to edit message");
+        }).await?;
+
+        match setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
+            Some(mc) => {
+                mc.create_interaction_response(&ctx, |re| {
+                    re.kind(InteractionResponseType::DeferredUpdateMessage)
+                }).await.expect("Unable to send interaction response");
+
+                match mc.data.custom_id.as_str() {
+                    "set_message" => {
+                        setup_message.edit(&ctx, |m| {
+                            m.content("");
+                            m.embed(|e| {
+                                e.title("Reply to me with the message")
+                            });
+                            m.components(|c| {
+                                c.set_action_rows(vec!())
+                            })
+                        }).await.expect("Unable to edit message");
+
+                        instructions_message = await_message_reply(&ctx, setup_message.clone()).await.expect("Unable to get a response");
+                    }
+                    "add_embed" => {
+                        setup_message.edit(&ctx, |m| {
+                            m.embed(|e| {
+                                e.title("Reply with json representing the embed")
+                            });
+                            m.components(|c| {
+                                c.set_action_rows(vec!())
+                            })
+                        }).await.expect("Unable to edit message");
+
+                        let response = await_message_reply(&ctx, setup_message.clone()).await.expect("Unable to receive reply");
+                        let json: serde_json::Result<HashMap<String, Value>> = serde_json::from_str(&response);
+                        match json {
+                            Ok(mut json) => {
+                                json.insert(String::from("type"), json!("rich"));
+                                let embed: Embed = serde_json::from_str(serde_json::to_string(&json).unwrap().as_str()).expect("Unable to deserialize");
+                                let embed = CreateEmbed::from(embed);
+
+                                embeds.push(embed)}
+                            Err(why) => {
+                                setup_message.channel_id.send_message(&ctx, |m| {
+                                    m.reference_message(MessageReference::from(&setup_message));
+                                    m.flags(MessageFlags::EPHEMERAL);
+                                    m.content("Invalid JSON")
+                                }).await?;
+                                println!("{}", why);
+                            }
+                        }
+
+                    }
+                    "done" => { break; }
+                    "cancel" => {
+                        setup_message.delete(&ctx).await.expect("Unable to delete message");
+                        return Err(Error::Zangra(ZangraError::new("cancel")));
+                    }
+                    _ => {}
+                }
+            }
+            None => {}
+        }
     }
 
     let select_menu = |selected_roles: Vec<RoleId>| {
