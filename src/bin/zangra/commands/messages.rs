@@ -283,197 +283,70 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         })
     }).await.expect("Error sending setup message in createroleselection");
 
-    let mut interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
+    loop {
+        let interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
 
-    //while continue button is not pressed
-    //Select the roles that a user can choose from
-    while let Some(ref mc) = interaction {
-        mc.create_interaction_response(&ctx, |re| {
-            re.kind(InteractionResponseType::DeferredUpdateMessage)
-        }).await.unwrap();
+        match interaction {
+            Some(mc) => {
+                mc.create_interaction_response(&ctx, |re| {
+                    re.kind(InteractionResponseType::DeferredUpdateMessage)
+                }).await?;
 
-        if mc.data.custom_id.as_str() == "continue" {
-            break;
-        }
+                if mc.data.custom_id.as_str() == "continue" {
+                    break;
+                }
 
-        match mc.data.custom_id.as_str() {
-            "previous_page" => {
-                //retreat the selection list, everything else stays the same
-                page_index -= 1;
-            }
-            "next_page" => {
-                //advance the selection list, everything else stays the same
-                page_index += 1;
-            }
-            "cancel" => {
-                setup_message.delete(&ctx).await.expect("Error deleting setup message");
-                return Err(Error::Zangra(ZangraError::new("cancel")));
-            }
-            "select_guild_roles" => {
-                //user has selected items from the list, update selected roles and update display
-                mc.data.values.iter()
-                    .for_each(|r| {
-                        println!("{}", guild_roles.get(&RoleId(r.parse().unwrap())).unwrap().name.as_str());
-                        if !selected_roles.contains(&RoleId(r.parse().unwrap())) {
-                            selected_roles.push(RoleId(r.parse().unwrap()));
-                        }
-                    });
+                match mc.data.custom_id.as_str() {
+                    "previous_page" => {
+                        //retreat the selection list, everything else stays the same
+                        page_index -= 1;
+                    }
+                    "next_page" => {
+                        //advance the selection list, everything else stays the same
+                        page_index += 1;
+                    }
+                    "cancel" => {
+                        setup_message.delete(&ctx).await?;
+                        return Err(Error::Zangra(ZangraError::new("cancel")));
+                    }
+                    "select_guild_roles" => {
+                        //user has selected items from the list, update selected roles and update display
+                        mc.data.values.iter()
+                            .for_each(|r| {
+                                println!("{}", guild_roles.get(&RoleId(r.parse().unwrap())).unwrap().name.as_str());
+                                if !selected_roles.contains(&RoleId(r.parse().unwrap())) {
+                                    selected_roles.push(RoleId(r.parse().unwrap()));
+                                }
+                            });
 
-                for (i, roleid) in guild_roles.keys().sorted().enumerate() {
-                    if page_index * list_max <= i && i < (page_index * list_max) + list_max {
+                        for (i, roleid) in guild_roles.keys().sorted().enumerate() {
+                            if page_index * list_max <= i && i < (page_index * list_max) + list_max {
 
-                        //if roleid isn't in values, remove from selected_roles
-                        if !mc.data.values.contains(&roleid.to_string()) {
-                            //remove from selected_roles
-                            if let Some(i) = selected_roles.iter().position(|p| p == roleid) {
-                                selected_roles.remove(i);
+                                //if roleid isn't in values, remove from selected_roles
+                                if !mc.data.values.contains(&roleid.to_string()) {
+                                    //remove from selected_roles
+                                    if let Some(i) = selected_roles.iter().position(|p| p == roleid) {
+                                        selected_roles.remove(i);
+                                    }
+                                }
                             }
                         }
                     }
+                    _ => {}
                 }
+
+                setup_message.edit(&ctx, |m| {
+                    m.set_embed(role_selection_prompt(&page_index, &selected_roles));
+                    m.components(|c| {
+                        c.add_action_row(role_selection_buttons_action_row(&page_index, &selected_roles));
+                        c.add_action_row(role_selection_menu(&guild_roles, &page_index, &list_max, &selected_roles))
+                    })
+                }).await?;
             }
-            _ => {}
+            None => {}
         }
-
-        setup_message.edit(&ctx, |m| {
-            m.set_embed(role_selection_prompt(&page_index, &selected_roles));
-            m.components(|c| {
-                c.add_action_row(role_selection_buttons_action_row(&page_index, &selected_roles));
-                c.add_action_row(role_selection_menu(&guild_roles, &page_index, &list_max, &selected_roles))
-            })
-        }).await.expect("Unable to edit message");
-
-        interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await;
     }
 
-
-    // setup_message.edit(&ctx, |m| {
-    //     m.embed(|e| {
-    //         e.title("Add emoji to selections?")
-    //     });
-    //     m.components(|c| {
-    //         c.create_action_row(|ar| {
-    //             ar.add_select_menu(select_menu)
-    //         })
-    //     })
-    // })
-
-    // let guild_emojis: HashMap<EmojiId, Emoji> = guild_id.to_guild_cached(ctx).await.unwrap().emojis;
-    // let emoji_selection_buttons_action_row = |page_index: &usize| {
-    //     CreateActionRow::default()
-    //         .create_button(|b| {
-    //             b.custom_id("previous_page");
-    //             b.label("Previous Page");
-    //             b.style(ButtonStyle::Primary);
-    //             if page_index == &0 {
-    //                 b.disabled(true);
-    //             }
-    //             b
-    //         })
-    //         .create_button(|b| {
-    //             b.custom_id("next_page");
-    //             b.label("Next Page");
-    //             b.style(ButtonStyle::Primary);
-    //             if (page_index + 1) * list_max > guild_emojis.len() {
-    //                 b.disabled(true);
-    //             }
-    //             b
-    //         })
-    //         .create_button(|b| {
-    //             b.custom_id("cancel");
-    //             b.label("Cancel");
-    //             b.style(ButtonStyle::Danger)
-    //         })
-    //         .clone()
-    // };
-    //
-    // let mut page_index = 0;
-    // let emojis_select_menu = |page_index: &usize| {
-    //     CreateActionRow::default().create_select_menu(|sm| {
-    //         let mut list_length = 0;
-    //         sm
-    //             .custom_id("select_emoji")
-    //             .placeholder("Select emoji")
-    //             .min_values(1)
-    //             .max_values(1)
-    //             .options(|ops| { //List all roles available in guild
-    //                 let options: Vec<CreateSelectMenuOption> = guild_emojis
-    //                     .iter()
-    //                     .skip(page_index * list_max)
-    //                     .take(25)
-    //                     .map(|(emojiid, emoji)| {
-    //                         CreateSelectMenuOption::default()
-    //                             .label(emoji.name.as_str())
-    //                             .value(emoji.id.as_u64())
-    //                             .emoji(emojiid.clone().into())
-    //                             .to_owned()
-    //                     }).collect();
-    //                 list_length = options.len();
-    //                 ops.set_options(options)
-    //             })
-    //     })
-    //         .clone()
-    // };
-    //
-    // let mut roles_and_emojis: HashMap<RoleId, EmojiId> = HashMap::new();
-    // for roleid in &selected_roles {
-    //     let emoji_selection_embed = |page_index: &usize| {
-    //         let mut embed = CreateEmbed::default();
-    //         embed.title(format!("Pick an emoji to represent this role: *{}*", guild_roles.get(&roleid).unwrap().name));
-    //         embed.color(random_color());
-    //         embed.footer(|f| {
-    //             f.text(format!("Page {}/{}", page_index + 1, (guild_emojis.len() / list_max) + 1))
-    //         });
-    //         embed
-    //     };
-    //
-    //     setup_message.edit(&ctx, |m| {
-    //         m.set_embed(emoji_selection_embed(&page_index));
-    //         m.components(|c| {
-    //             c.add_action_row(emoji_selection_buttons_action_row(&page_index));
-    //             c.add_action_row(emojis_select_menu(&page_index))
-    //         })
-    //     }).await.unwrap(); //error handle this later
-    //
-    //
-    //     let mut done = false;
-    //     while !done {
-    //         match setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await {
-    //             Some(mc) => {
-    //                 match mc.data.custom_id.as_str() {
-    //                     "previous_page" => {
-    //                         page_index -= 1;
-    //                     }
-    //                     "next_page" => {
-    //                         page_index += 1;
-    //                     }
-    //                     "cancel" => {
-    //                         setup_message.delete(&ctx).await.unwrap();
-    //                         return None;
-    //                     }
-    //                     "select_emoji" => {
-    //                         let emoji_id = EmojiId(mc.data.values.first().unwrap().parse().unwrap());
-    //                         roles_and_emojis.insert(roleid.clone(), emoji_id);
-    //                         done = true;
-    //                     }
-    //                     _ => {}
-    //                 }
-    //
-    //                 mc.create_interaction_response(&ctx, |re| {
-    //                     re.kind(InteractionResponseType::UpdateMessage);
-    //                     re.interaction_response_data(|d| {
-    //                         d.embeds(vec![emoji_selection_embed(&page_index)]);
-    //                         d.components(|c| {
-    //                             c.add_action_row(emoji_selection_buttons_action_row(&page_index));
-    //                             c.add_action_row(emojis_select_menu(&page_index))
-    //                         })
-    //                     })
-    //                 }).await.unwrap();
-    //             }
-    //             None => {}
-    //         }
-    //     }
-    // }
     setup_message.edit(&ctx, |m| {
         m.embed(|e| {
             e.title("Add descriptions to selections?")
