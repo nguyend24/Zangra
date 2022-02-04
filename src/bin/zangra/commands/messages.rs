@@ -3,11 +3,9 @@ use std::{
     time::Duration,
 };
 use std::cmp::min;
-use std::str::FromStr;
 
-use itertools::{enumerate, Itertools};
+use itertools::{Itertools};
 use rand::distributions::{Distribution, Uniform};
-use serde::de::Error;
 
 use serde_json::{json, Value};
 use serenity::{
@@ -20,7 +18,7 @@ use serenity::{
         channel::Message,
         event::{Event, EventType},
         guild::{Emoji, Role},
-        id::{ChannelId, EmojiId, GuildId, RoleId},
+        id::{ChannelId, GuildId, RoleId},
         interactions::{
             Interaction,
             InteractionResponseType,
@@ -30,12 +28,11 @@ use serenity::{
     utils::Color,
 };
 use serenity::model::channel::{Embed, MessageFlags, MessageReference};
-use serenity::model::guild::Target::Channel;
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;
 use serenity::model::prelude::InteractionApplicationCommandCallbackDataFlags;
 
 use crate::DatabasePool;
-
+use crate::error::*;
 fn random_color() -> Color {
     let mut rng = rand::thread_rng();
     let between = Uniform::from(0..255);
@@ -136,7 +133,7 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> bo
 pub async fn createroleselection(ctx: &Context, msg: &Message) -> CommandResult {
     // msg.delete(&ctx).await.unwrap();
 
-    if let Some(role_selector) = role_selection_message_setup(ctx, msg.guild_id.unwrap().clone(), msg.channel_id.clone(), None).await {
+    if let Ok(role_selector) = role_selection_message_setup(ctx, msg.guild_id.unwrap().clone(), msg.channel_id.clone(), None).await {
         let data = ctx.data.read().await;
         let pool = data.get::<DatabasePool>().unwrap().clone();
 
@@ -165,7 +162,7 @@ pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommand
     //         .await
     //         .unwrap();
     // }
-    if let Some(role_selector) = role_selection_message_setup(&ctx, guild_id.clone(), channel_id.clone(), None).await {
+    if let Ok(role_selector) = role_selection_message_setup(&ctx, guild_id.clone(), channel_id.clone(), None).await {
         let data = ctx.data.read().await;
         let pool = data.get::<DatabasePool>().unwrap().clone();
 
@@ -178,7 +175,7 @@ pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommand
     }
 }
 
-async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, edit_message: Option<Message>) -> Option<RoleSelector> {
+async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_id: ChannelId, edit_message: Option<Message>) -> Result<RoleSelector> {
     let guild_roles: HashMap<RoleId, Role> = guild_id.roles(&ctx).await.expect("Error getting guild roles in createroleselection");
     let guild_emojis: Vec<Emoji> = guild_id.emojis(&ctx).await.expect("Unable to retrieve the guild's emojis");
     let mut selected_roles: Vec<RoleId> = Vec::new(); //Roles available for a user to choose from
@@ -310,7 +307,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             }
             "cancel" => {
                 setup_message.delete(&ctx).await.expect("Error deleting setup message");
-                return None;
+                return Err(Error::Zangra(ZangraError::new("cancel")));
             }
             "select_guild_roles" => {
                 //user has selected items from the list, update selected roles and update display
@@ -534,7 +531,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                 "no" => {}
                 "cancel" => {
                     setup_message.delete(&ctx).await.expect("Unable to delete message");
-                    return None;
+                    return Err(Error::Zangra(ZangraError::new("cancel")));
                 }
                 _ => {
                     //should not happen
@@ -679,7 +676,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             "done" => { break; }
             "cancel" => {
                 setup_message.delete(&ctx).await.expect("Unable to delete message");
-                return None;
+                return Err(Error::Zangra(ZangraError::new("cancel")));
             }
             _ => {}
         }
@@ -777,10 +774,10 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         embeds: embeds,
         action_rows: action_rows,
     };
-    Some(role_selector)
+    Ok(role_selector)
 }
 
-async fn await_message_reply(ctx: &Context, parent_message: Message) -> Result<String, String> {
+async fn await_message_reply(ctx: &Context, parent_message: Message) -> std::result::Result<String, String> {
     let timeout = 60 * 5; //In seconds
 
     let event_builder = EventCollectorBuilder::new(&ctx)

@@ -44,6 +44,7 @@ use crate::utils::database::{DatabasePool, get_sqlite_pool};
 mod commands;
 mod config;
 mod edbh;
+mod error;
 mod limited_budgetworks_server;
 mod misc;
 mod test_server;
