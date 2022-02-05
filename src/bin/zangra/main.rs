@@ -14,7 +14,11 @@ use serenity::{
         channel::Reaction,
         guild::Member,
         gateway::Ready,
-        interactions::Interaction,
+        interactions::{
+            application_command::{ApplicationCommand, ApplicationCommandType},
+            Interaction,
+            InteractionResponseType
+        },
         voice::VoiceState,
     },
 
@@ -27,17 +31,13 @@ use commands::{math::*, ping::*, messages::*, meta::*, test::*};
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified, add_member_welcome_message};
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read};
 
 use serde::{
     Deserialize, // To deserialize data into structures
     Serialize,
 };
-use serenity::builder::CreateActionRow;
-use serenity::model::id::CommandId;
-use serenity::model::interactions::application_command::ApplicationCommand;
-use serenity::model::interactions::InteractionResponseType;
-use serenity::model::interactions::message_component::ButtonStyle;
+
 
 use crate::utils::database::{DatabasePool, get_sqlite_pool};
 
@@ -114,7 +114,11 @@ impl EventHandler for Handler {
                     println!("{}", cid);
                     command.get_interaction_response(&ctx).await.unwrap().delete(&ctx).await;
                     createroleselectorslash(&ctx, &command).await;
-
+                }
+                "Edit Role Selector" => {
+                    if let Err(why) = edit_role_selector(&ctx, &command).await {
+                        println!("Unable to edit role selector: {}", why);
+                    };
                 }
 
                 _ => {}
@@ -157,6 +161,13 @@ impl EventHandler for Handler {
         }).await {
             println!("Unable to create slash command: {}", why);
         };
+
+        if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |command| {
+            command.name("Edit Role Selector");
+            command.kind(ApplicationCommandType::Message)
+        }).await {
+            println!("Unable to create slash command: {}", why);
+        }
     }
 
     async fn voice_state_update(&self, ctx: Context, guild_id: Option<GuildId>, old: Option<VoiceState>, new: VoiceState) {

@@ -1,9 +1,10 @@
 use std::error::Error as StdError;
 use std::fmt::{Debug, Display, Formatter};
-use std::result;
+use std::{fmt, result};
 
 use serenity::Error as SerenityError;
 use serde_json::Error as JsonError;
+use sqlx::Error as SqlxError;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -42,6 +43,7 @@ impl StdError for ZangraError {
 pub enum Error {
     Json(JsonError),
     Serenity(SerenityError),
+    Sqlx(SqlxError),
     Zangra(ZangraError),
 }
 
@@ -57,9 +59,34 @@ impl From<SerenityError> for Error {
     }
 }
 
+impl From<SqlxError> for Error {
+    fn from(e: SqlxError) -> Self {
+        Error::Sqlx(e)
+    }
+}
+
 impl From<ZangraError> for Error {
     fn from(e: ZangraError) -> Self {
         Error::Zangra(e)
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Json(e) => {
+                fmt::Display::fmt(e, f)
+            }
+            Error::Serenity(e) => {
+                fmt::Display::fmt(e, f)
+            }
+            Error::Sqlx(e) => {
+                fmt::Display::fmt(e, f)
+            }
+            Error::Zangra(e) => {
+                fmt::Display::fmt(e, f)
+            }
+        }
     }
 }
 

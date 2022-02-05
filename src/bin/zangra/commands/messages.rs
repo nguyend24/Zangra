@@ -46,6 +46,57 @@ struct RoleSelector {
     action_rows: Vec<CreateActionRow>,
 }
 
+pub async fn edit_role_selector<'a, C: Into<&'a Context>>(ctx: C, command: &ApplicationCommandInteraction) -> Result<()> {
+    let ctx = ctx.into();
+
+    let followup_message = command.create_followup_message(&ctx, |m| m.content("Thinking...")).await?;
+    followup_message.delete(&ctx).await.unwrap();
+
+    let data = ctx.data.read().await;
+    let pool = data.get::<DatabasePool>().unwrap().clone();
+
+    let messages = &command.data.resolved.messages;
+    let member = match command.member {
+        Some(ref m) => {m}
+        None => {return Err(Error::Zangra(ZangraError::new("Unable to retrieve member")))}
+    };
+    let guild_id = match command.guild_id {
+        Some(gid) => {gid}
+        None => {return Err(Error::Zangra(ZangraError::new("Unable to find guild id")))}
+    };
+
+    for (message_id, message) in messages {
+        match sqlx::query("select AutoRoleMessageId from AutoRoleMessage where AutoRoleMessageId = ?")
+            .bind(*message_id.as_u64() as i64)
+            .fetch_one(&pool)
+            .await {
+            Ok(_row) => {
+                let permissions = member.permissions.expect("Unable to read a member's permissions");
+                if permissions.administrator() {
+                    let channel_id = &command.channel_id;
+
+                    let role_selector = role_selection_message_setup(ctx, guild_id, channel_id.clone(), Some(message.clone()))
+                        .await
+                        .expect("Unable to setup role selector message");
+
+                    message.clone().edit(&ctx, |m| {
+                        m.content(role_selector.content);
+                        m.set_embeds(role_selector.embeds);
+                        m.components(|c| {
+                            c.set_action_rows(role_selector.action_rows)
+                        })
+                    }).await?;
+
+                    role_selector.setup_message.delete(&ctx).await.expect("Unable to delete role selector set up message")
+                }
+            }
+            Err(_why) => {}
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> bool {
     let data = ctx.data.read().await;
     let pool = data.get::<DatabasePool>().unwrap().clone();
@@ -131,8 +182,6 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> bo
 
 #[command]
 pub async fn createroleselection(ctx: &Context, msg: &Message) -> CommandResult {
-    // msg.delete(&ctx).await.unwrap();
-
     if let Ok(role_selector) = role_selection_message_setup(ctx, msg.guild_id.unwrap().clone(), msg.channel_id.clone(), None).await {
         let data = ctx.data.read().await;
         let pool = data.get::<DatabasePool>().unwrap().clone();
@@ -151,17 +200,7 @@ pub async fn createroleselection(ctx: &Context, msg: &Message) -> CommandResult 
 pub async fn createroleselectorslash(ctx: &Context, command: &ApplicationCommandInteraction) {
     let guild_id = command.guild_id.unwrap();
     let channel_id = command.channel_id;
-    // if let Some(role_selector) = role_selection_message_setup(ctx, msg.guild_id.unwrap().clone(), msg.channel_id.clone(), None).await {
-    //     let data = ctx.data.read().await;
-    //     let pool = data.get::<DatabasePool>().unwrap().clone();
-    //
-    //     let role_selector_msg = role_selector.setup_message;
-    //     sqlx::query("insert into AutoRoleMessage (AutoRoleMessageId) values (?)")
-    //         .bind(role_selector_msg.id.as_u64().clone() as i64)
-    //         .execute(&pool)
-    //         .await
-    //         .unwrap();
-    // }
+
     if let Ok(role_selector) = role_selection_message_setup(&ctx, guild_id.clone(), channel_id.clone(), None).await {
         let data = ctx.data.read().await;
         let pool = data.get::<DatabasePool>().unwrap().clone();
@@ -180,11 +219,8 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     let guild_emojis: Vec<Emoji> = guild_id.emojis(&ctx).await?;
     let mut selected_roles: Vec<RoleId> = Vec::new(); //Roles available for a user to choose from
 
-
-    //Send setup message
     let mut page_index = 0;
     let list_max = 25;
-
 
     let role_selection_menu = |guild_roles: &HashMap<RoleId, Role>, page_index: &usize, list_max: &usize, selected_roles: &Vec<RoleId>| {
         CreateActionRow::default().create_select_menu(|sm| {
@@ -213,6 +249,8 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
             .clone()
     };
 
+    //Role selection phase
+    //Picking the roles that will be provided to a user as options once finished
     let role_selection_prompt = |page_index: &usize, selected_roles: &Vec<RoleId>| {
         let mut embed = CreateEmbed::default();
         embed.title("Select Roles for this Role Selector");
@@ -347,6 +385,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         }
     }
 
+    //Adding descriptions to each previously selected role phase
     setup_message.edit(&ctx, |m| {
         m.embed(|e| {
             e.title("Add descriptions to selections?")
