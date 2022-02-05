@@ -119,51 +119,6 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> Re
             let mut member = mc.member.clone().expect("Can't access member");
 
             match mc.data.custom_id.as_str() {
-                "clear_roles" => {
-                    for ar in msg.components {
-                        for com in ar.components {
-                            match com {
-                                ActionRowComponent::SelectMenu(sm) => {
-                                    for role in sm.options {
-                                        let mut member = mc.member.clone().unwrap();
-                                        let _ = member.remove_role(&ctx, RoleId(role.value.parse().unwrap())).await;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-                "edit" => {
-                    let permissions = member.permissions.expect("Unable to read a member's permissions");
-                    if permissions.administrator() {
-                        let guild_id = mc
-                            .guild_id
-                            .expect("Unable to retrieve guildId from interaction");
-
-                        let channel_id = mc.channel_id;
-                        let role_selector = role_selection_message_setup(ctx, guild_id, channel_id, Some(msg.clone()))
-                            .await
-                            .expect("Unable to setup role selector message");
-
-                        msg.edit(&ctx, |m| {
-                            m.content(role_selector.content);
-                            m.set_embeds(role_selector.embeds);
-                            m.components(|c| {
-                                c.set_action_rows(role_selector.action_rows)
-                            })
-                        }).await.expect("Unable to edit original role selector message");
-
-                        role_selector.setup_message.delete(&ctx).await.expect("Unable to delete role selector set up message")
-                    } else {
-                        if let Err(why) = mc.create_followup_message(&ctx, |m| {
-                            m.content("This function is only enabled for administrators.");
-                            m.flags(InteractionApplicationCommandCallbackDataFlags::EPHEMERAL)
-                        }).await {
-                            println!("Unable to create interaction follow up message: {}", why);
-                        }
-                    }
-                }
                 "selectmenu" => {
                     let selected_role_ids: Vec<RoleId> = mc.data.values.iter().map(|rid| RoleId(rid.parse().unwrap())).collect();
                     let _ = mc.member.clone().unwrap().clone().add_roles(&ctx, &*selected_role_ids).await;
@@ -185,7 +140,6 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> Re
 
                         })
                     });
-
 
                     for role_id in &selection_menu {
                         if member.roles.contains(role_id) && !selected_role_ids.contains(role_id) {
@@ -648,25 +602,11 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     };
 
     let mut action_rows: Vec<CreateActionRow> = Vec::new();
-
-    let buttons = CreateActionRow::default()
-        .create_button(|b| {
-            b.custom_id("clear_roles");
-            b.label("Clear Roles");
-            b.style(ButtonStyle::Primary)
-        })
-        .create_button(|b| {
-            b.custom_id("edit");
-            b.label("Edit");
-            b.style(ButtonStyle::Secondary)
-        })
-        .clone();
     let selection_menu = CreateActionRow::default()
         .add_select_menu(select_menu(selected_roles.clone()))
         .clone();
 
     action_rows.push(selection_menu);
-    action_rows.push(buttons);
 
     setup_message.edit(&ctx, |m| {
         m.content(&instructions_message);
