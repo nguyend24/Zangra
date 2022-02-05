@@ -33,6 +33,7 @@ use serenity::model::prelude::InteractionApplicationCommandCallbackDataFlags;
 
 use crate::DatabasePool;
 use crate::error::*;
+
 fn random_color() -> Color {
     let mut rng = rand::thread_rng();
     let between = Uniform::from(0..255);
@@ -57,12 +58,12 @@ pub async fn edit_role_selector<'a, C: Into<&'a Context>>(ctx: C, command: &Appl
 
     let messages = &command.data.resolved.messages;
     let member = match command.member {
-        Some(ref m) => {m}
-        None => {return Err(Error::Zangra(ZangraError::new("Unable to retrieve member")))}
+        Some(ref m) => { m }
+        None => { return Err(Error::Zangra(ZangraError::new("Unable to retrieve member"))); }
     };
     let guild_id = match command.guild_id {
-        Some(gid) => {gid}
-        None => {return Err(Error::Zangra(ZangraError::new("Unable to find guild id")))}
+        Some(gid) => { gid }
+        None => { return Err(Error::Zangra(ZangraError::new("Unable to find guild id"))); }
     };
 
     for (message_id, message) in messages {
@@ -137,7 +138,6 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> Re
                                 }
                                 _ => {}
                             }
-
                         })
                     });
 
@@ -366,6 +366,79 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
         }
     }
 
+    //Change ordering of selections
+    setup_message.edit(&ctx, |m| {
+        m.embed(|e| {
+            e.title("Choose an ordering for the list")
+        });
+        m.components(|c| {
+            c.create_action_row(|ar| {
+                ar.create_button(|b| {
+                    b.custom_id("alphabetical");
+                    b.label("Alphabetical");
+                    b.style(ButtonStyle::Primary)
+                });
+                ar.create_button(|b| {
+                    b.custom_id("manual");
+                    b.label("Manual");
+                    b.style(ButtonStyle::Primary)
+                })
+            })
+        })
+    }).await?;
+
+    {
+        let interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await.unwrap();
+        interaction.create_interaction_response(&ctx, |re| {
+            re.kind(InteractionResponseType::DeferredUpdateMessage)
+        }).await?;
+
+        match interaction.data.custom_id.as_str() {
+            "alphabetical" => {
+                selected_roles.sort_by(|a, b| guild_roles.get(a).unwrap().name.cmp(&guild_roles.get(b).unwrap().name));
+            }
+            "manual" => {
+                println!("{}", selected_roles.len());
+                setup_message.edit(&ctx, |m| {
+                    m.embed(|e| {
+                        e.title("Make selections in the desired order")
+                    });
+                    m.components(|c| {
+                        c.create_action_row(|ar| {
+                            ar.create_select_menu(|sm| {
+                                sm.custom_id("manual_selection");
+                                sm.min_values(selected_roles.len() as u64);
+                                sm.max_values(selected_roles.len() as u64);
+                                sm.options(|ops| {
+                                    let sm_options:Vec<CreateSelectMenuOption> = selected_roles.iter()
+                                        .map(|role_id| {
+                                            CreateSelectMenuOption::default()
+                                                .value(role_id.as_u64())
+                                                .label(guild_roles.get(role_id).unwrap().name.clone())
+                                                .clone()
+                                        })
+                                        .collect();
+                                    ops.set_options(sm_options)
+                                })
+                                // sm.min_values(selected_roles.len() as u64)
+                            })
+                        })
+                    })
+                }).await?;
+
+                let interaction = setup_message.await_component_interaction(&ctx).timeout(Duration::from_secs(60 * 10)).await.unwrap();
+                interaction.create_interaction_response(&ctx, |re| {
+                    re.kind(InteractionResponseType::DeferredUpdateMessage)
+                }).await?;
+
+                selected_roles = interaction.data.values.iter().map(|s| {
+                    RoleId(s.parse().unwrap())
+                }).collect();
+            }
+            _ => {}
+        }
+    }
+
     //Adding descriptions to each previously selected role phase
     setup_message.edit(&ctx, |m| {
         m.embed(|e| {
@@ -554,7 +627,8 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                                 let embed: Embed = serde_json::from_str(serde_json::to_string(&json).unwrap().as_str()).expect("Unable to deserialize");
                                 let embed = CreateEmbed::from(embed);
 
-                                embeds.push(embed)}
+                                embeds.push(embed)
+                            }
                             Err(why) => {
                                 setup_message.channel_id.send_message(&ctx, |m| {
                                     m.reference_message(MessageReference::from(&setup_message));
@@ -564,7 +638,6 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                                 println!("{}", why);
                             }
                         }
-
                     }
                     "done" => { break; }
                     "cancel" => {
