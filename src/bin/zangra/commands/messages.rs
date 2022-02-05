@@ -608,6 +608,10 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                         }).await.expect("Unable to edit message");
 
                         instructions_message = await_message_reply(&ctx, setup_message.clone()).await.expect("Unable to get a response");
+
+                        setup_message.edit(&ctx, |m| {
+                            m.content(&instructions_message)
+                        }).await?
                     }
                     "add_embed" => {
                         setup_message.edit(&ctx, |m| {
@@ -725,7 +729,9 @@ async fn await_message_reply(ctx: &Context, parent_message: Message) -> std::res
                 match event.as_ref() {
                     Event::MessageCreate(m) => {
                         msg = m.message.content.clone();
-
+                        //discord sometimes hangs and doesn't delete the message
+                        //hopefully this slows it down enough for discord
+                        std::thread::sleep(Duration::from_secs(1));
                         if let Err(why) = m.message.delete(&ctx).await {
                             println!("{}", why);
                         }
