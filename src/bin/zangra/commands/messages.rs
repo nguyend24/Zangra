@@ -22,7 +22,7 @@ use serenity::{
         interactions::{
             Interaction,
             InteractionResponseType,
-            message_component::{ActionRowComponent, ButtonStyle},
+            message_component::{ActionRowComponent, ButtonStyle, ComponentType},
         },
     },
     utils::Color,
@@ -97,7 +97,7 @@ pub async fn edit_role_selector<'a, C: Into<&'a Context>>(ctx: C, command: &Appl
     Ok(())
 }
 
-pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> bool {
+pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> Result<()> {
     let data = ctx.data.read().await;
     let pool = data.get::<DatabasePool>().unwrap().clone();
 
@@ -116,7 +116,7 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> bo
             }).await.expect("autorole_selections");
 
             let mut msg = mc.message.clone();
-            let member = mc.member.clone().expect("Can't access member");
+            let mut member = mc.member.clone().expect("Can't access member");
 
             match mc.data.custom_id.as_str() {
                 "clear_roles" => {
@@ -165,19 +165,46 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> bo
                     }
                 }
                 "selectmenu" => {
-                    let role_ids: Vec<RoleId> = mc.data.values.iter().map(|rid| RoleId(rid.parse().unwrap())).collect();
-                    let _ = mc.member.clone().unwrap().clone().add_roles(&ctx, &*role_ids).await;
+                    let selected_role_ids: Vec<RoleId> = mc.data.values.iter().map(|rid| RoleId(rid.parse().unwrap())).collect();
+                    let _ = mc.member.clone().unwrap().clone().add_roles(&ctx, &*selected_role_ids).await;
+                    let mut selection_menu: Vec<RoleId> = Vec::new();
+
+                    msg.components.iter().for_each(|ar| {
+                        ar.components.iter().for_each(|ac| {
+                            match ac {
+                                ActionRowComponent::Button(_) => {}
+                                ActionRowComponent::SelectMenu(sm) => {
+                                    let role_ids: Vec<RoleId> = sm.options.iter().map(|smo| {
+                                        let u64_role_id = smo.value.parse().unwrap();
+                                        RoleId(u64_role_id)
+                                    }).collect();
+                                    selection_menu.extend(role_ids);
+                                }
+                                _ => {}
+                            }
+
+                        })
+                    });
+
+
+                    for role_id in &selection_menu {
+                        if member.roles.contains(role_id) && !selected_role_ids.contains(role_id) {
+                            let _ = member.remove_role(&ctx, role_id).await;
+                        } else {
+                            let _ = member.add_roles(&ctx, &*selected_role_ids).await;
+                        }
+                    }
+                    //Edits the message with the same message in order to reset the selection menu
                     msg.clone().edit(&ctx, |m| {
                         m.content(msg.content.clone())
-                    }).await.unwrap();
+                    }).await?;
                 }
                 _ => {}
             }
-            return true;
         }
     }
 
-    false
+    Ok(())
 }
 
 #[command]

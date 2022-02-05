@@ -125,9 +125,7 @@ impl EventHandler for Handler {
             }
         }
 
-        if autorole_selections(&ctx, &interaction).await {
-            return;
-        }
+        autorole_selections(&ctx, &interaction).await.unwrap();
     }
 
     async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
