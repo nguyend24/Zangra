@@ -149,9 +149,6 @@ pub async fn autorole_selections(ctx: &Context, interaction: &Interaction) -> Re
                         }
                     }
                     //Edits the message with the same message in order to reset the selection menu
-                    msg.clone().edit(&ctx, |m| {
-                        m.content(msg.content.clone())
-                    }).await?;
                 }
                 _ => {}
             }
@@ -382,7 +379,13 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                     b.custom_id("manual");
                     b.label("Manual");
                     b.style(ButtonStyle::Primary)
+                });
+                ar.create_button(|b| {
+                    b.custom_id("cancel");
+                    b.label("Cancel");
+                    b.style(ButtonStyle::Danger)
                 })
+
             })
         })
     }).await?;
@@ -434,6 +437,10 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
                 selected_roles = interaction.data.values.iter().map(|s| {
                     RoleId(s.parse().unwrap())
                 }).collect();
+            }
+            "cancel" => {
+                setup_message.delete(&ctx).await?;
+                return Err(Error::Zangra(ZangraError::new("cancel")))
             }
             _ => {}
         }
@@ -658,7 +665,7 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     let select_menu = |selected_roles: Vec<RoleId>| {
         let mut sm = CreateSelectMenu::default();
         sm.custom_id("selectmenu");
-        sm.min_values(1);
+        sm.min_values(0);
         sm.max_values(max_selection);
         sm.options(|ops| {
             let options: Vec<CreateSelectMenuOption> = selected_roles.iter().map(|rid| {
