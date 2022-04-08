@@ -22,14 +22,14 @@ use serenity::{
         interactions::{
             Interaction,
             InteractionResponseType,
-            message_component::{ActionRowComponent, ButtonStyle, ComponentType},
+            message_component::{ActionRowComponent, ButtonStyle},
         },
     },
     utils::Color,
 };
 use serenity::model::channel::{Embed, MessageFlags, MessageReference};
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;
-use serenity::model::prelude::InteractionApplicationCommandCallbackDataFlags;
+
 
 use crate::DatabasePool;
 use crate::error::*;

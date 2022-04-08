@@ -11,13 +11,12 @@ use serenity::{
         StandardFramework},
     model::{
         id::{ChannelId, GuildId},
-        channel::Reaction,
+        channel::{ChannelType, Message, Reaction},
         guild::Member,
         gateway::Ready,
         interactions::{
-            application_command::{ApplicationCommand, ApplicationCommandType},
-            Interaction,
-            InteractionResponseType
+            application_command::{ApplicationCommand, ApplicationCommandType, ApplicationCommandOptionType},
+            Interaction
         },
         voice::VoiceState,
     },
@@ -38,6 +37,7 @@ use serde::{
     Serialize,
 };
 
+use crate::commands::webblock::{edit_interaction, webblock, webblock_check_message};
 
 use crate::utils::database::{DatabasePool, get_sqlite_pool};
 
@@ -102,11 +102,11 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = &interaction {
-            if let Err(why) = command.create_interaction_response(&ctx, |re| {
-                re.kind(InteractionResponseType::DeferredChannelMessageWithSource)
-            }).await {
-                println!("Cannot respond to slash command: {}", why);
-            };
+            // if let Err(why) = command.create_interaction_response(&ctx, |re| {
+            //     re.kind(InteractionResponseType::DeferredChannelMessageWithSource)
+            // }).await {
+            //     println!("Cannot respond to slash command: {}", why);
+            // };
 
             match command.data.name.as_str() {
                 "createroleselector" => {
@@ -114,6 +114,9 @@ impl EventHandler for Handler {
                     println!("{}", cid);
                     command.get_interaction_response(&ctx).await.unwrap().delete(&ctx).await;
                     createroleselectorslash(&ctx, &command).await;
+                }
+                "webblock" => {
+                    webblock(&ctx, command).await.unwrap();
                 }
                 "Edit Role Selector" => {
                     if let Err(why) = edit_role_selector(&ctx, &command).await {
@@ -123,9 +126,33 @@ impl EventHandler for Handler {
 
                 _ => {}
             }
-        }
+        } else if let Interaction::MessageComponent(mc) = &interaction {
+            match mc.data.custom_id.as_str() {
+                "selectmenu" => {
+                    autorole_selections(&ctx, &interaction).await.unwrap();
+                }
+                _ => {}
+            }
+        } else if let Interaction::ModalSubmit(msi) = &interaction {
+            println!("{}", msi.data.custom_id.as_str());
+            match msi.data.custom_id.as_str().split(" ").next().unwrap_or("{}") {
+                "webblockedit" => {
+                    edit_interaction(&ctx, &msi).await.unwrap();
+                }
+                _ => {}
+            }
 
-        autorole_selections(&ctx, &interaction).await.unwrap();
+        } else {
+
+        }
+    }
+
+    async fn message(&self, ctx: Context, new_message: Message) {
+        if !new_message.author.bot {
+            if let Err(why) = webblock_check_message(&ctx, &new_message).await {
+                println!("Error webblock_check_message: {}", why);
+            }
+        }
     }
 
     async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
@@ -165,6 +192,62 @@ impl EventHandler for Handler {
             command.kind(ApplicationCommandType::Message)
         }).await {
             println!("Unable to create slash command: {}", why);
+        }
+
+        if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |c| {
+            c.name("webblock");
+            c.description("Create a block list for unwanted links");
+            c.default_permission(true);
+            c.create_option(|o| {
+                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.name("help");
+                o.description("Instructions for using link blocking feature")
+            });
+            c.create_option(|o| {
+                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.name("enable");
+                o.description("Turn on site blocking")
+            });
+            c.create_option(|o| {
+                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.name("disable");
+                o.description("Turn off site blocking")
+            });
+            c.create_option(|o| {
+                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.name("edit");
+                o.description("Edit the blocklist")
+            });
+            c.create_option(|logging| {
+                logging.kind(ApplicationCommandOptionType::SubCommandGroup);
+                logging.name("log");
+                logging.description("Log when actions are taken");
+                logging.create_sub_option(|enable| {
+                    enable.kind(ApplicationCommandOptionType::SubCommand);
+                    enable.name("enable");
+                    enable.description("Turn on logging of actions taken");
+                    enable.create_sub_option(|channel| {
+                        channel.kind(ApplicationCommandOptionType::Channel);
+                        channel.name("channel");
+                        channel.description("Choose channel to send log messages");
+                        channel.required(true);
+                        channel.channel_types(&[ChannelType::Text])
+                    })
+                });
+                logging.create_sub_option(|disable| {
+                    disable.kind(ApplicationCommandOptionType::SubCommand);
+                    disable.name("disable");
+                    disable.description("Turn off logging of actions taken")
+                })
+            });
+            c.create_option(|o| {
+                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.name("status");
+                o.description("Current configuration status for this server")
+            })
+        }).await {
+            println!("Unable to create slash command: {}", why);
+
         }
     }
 
