@@ -1,36 +1,29 @@
 use serenity::{
     async_trait,
-    client::{
-        bridge::gateway::GatewayIntents,
-        Client,
-        Context,
-        EventHandler
-    },
-    framework::{
-        standard::macros::group,
-        StandardFramework},
+    client::{Client, Context, EventHandler},
+    framework::{standard::macros::group, StandardFramework},
     model::{
-        id::{ChannelId, GuildId},
         channel::{ChannelType, Message, Reaction},
+        gateway::{GatewayIntents, Ready},
         guild::Member,
-        gateway::Ready,
+        id::{ChannelId, GuildId},
         interactions::{
-            application_command::{ApplicationCommand, ApplicationCommandType, ApplicationCommandOptionType},
-            Interaction
+            application_command::{ApplicationCommand, ApplicationCommandOptionType, ApplicationCommandType},
+            Interaction,
         },
+        permissions::Permissions,
         voice::VoiceState,
     },
-
     utils::Color,
 };
 
 use std::env;
 
-use commands::{math::*, ping::*, messages::*, meta::*, test::*};
+use commands::{math::*, messages::*, meta::*, ping::*, test::*};
 
-use crate::limited_budgetworks_server::utils::{add_member_join_role, add_role_rules_verified, add_member_welcome_message};
+use crate::limited_budgetworks_server::utils::{add_member_join_role, add_member_welcome_message, add_role_rules_verified};
 use std::fs::File;
-use std::io::{Read};
+use std::io::Read;
 
 use serde::{
     Deserialize, // To deserialize data into structures
@@ -39,7 +32,7 @@ use serde::{
 
 use crate::commands::webblock::{edit_interaction, webblock, webblock_check_message};
 
-use crate::utils::database::{DatabasePool, get_sqlite_pool};
+use crate::utils::database::{get_sqlite_pool, DatabasePool};
 
 mod commands;
 mod config;
@@ -93,8 +86,8 @@ pub struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn guild_member_addition(&self, ctx: Context, guild_id: GuildId, new_member: Member) {
-        if guild_id.as_u64() == &713889872359981076 {
+    async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
+        if new_member.guild_id.as_u64() == &713889872359981076 {
             add_member_join_role(&ctx, &new_member).await;
             add_member_welcome_message(&ctx, &new_member).await;
         }
@@ -110,9 +103,7 @@ impl EventHandler for Handler {
 
             match command.data.name.as_str() {
                 "createroleselector" => {
-                    let cid = command.data.id;
-                    println!("{}", cid);
-                    command.get_interaction_response(&ctx).await.unwrap().delete(&ctx).await;
+                    // command.get_interaction_response(&ctx).await.unwrap().delete(&ctx).await;
                     createroleselectorslash(&ctx, &command).await;
                 }
                 "webblock" => {
@@ -134,16 +125,13 @@ impl EventHandler for Handler {
                 _ => {}
             }
         } else if let Interaction::ModalSubmit(msi) = &interaction {
-            println!("{}", msi.data.custom_id.as_str());
             match msi.data.custom_id.as_str().split(" ").next().unwrap_or("{}") {
                 "webblockedit" => {
                     edit_interaction(&ctx, &msi).await.unwrap();
                 }
                 _ => {}
             }
-
         } else {
-
         }
     }
 
@@ -163,41 +151,38 @@ impl EventHandler for Handler {
         println!("{} is connected!", ready.user.name);
         println!("Version: {}", VERSION);
 
-        if let Err(why) = ChannelId(773036830580408330).send_message(&ctx, |m| {
-            m
-                .embed(|e| e
-                    .author(|a|  a
-                        .icon_url(&ready.user.face())
-                        .name(&ready.user.name)
-                    )
-                    .description(format!("\
+        if let Err(why) = ChannelId(773036830580408330)
+            .send_message(&ctx, |m| {
+                m.embed(|e| {
+                    e.author(|a| a.icon_url(&ready.user.face()).name(&ready.user.name))
+                        .description(format!(
+                            "\
                       {} is connected!\n\
                       Version: {}
-                      ", &ready.user.name, &VERSION))
-                    .color(Color::from_rgb(255, 128, 0))
-                )
-        }).await {
+                      ",
+                            &ready.user.name, &VERSION
+                        ))
+                        .color(Color::from_rgb(255, 128, 0))
+                })
+            })
+            .await
+        {
             println!("{}", why)
-        };
-
-        if let Err(why) =  ApplicationCommand::create_global_application_command(&ctx, |command| {
-            command.name("createroleselector");
-            command.description("Create a role selector prompt for users to choose their roles")
-        }).await {
-            println!("Unable to create slash command: {}", why);
         };
 
         if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |command| {
             command.name("Edit Role Selector");
             command.kind(ApplicationCommandType::Message)
-        }).await {
+        })
+        .await
+        {
             println!("Unable to create slash command: {}", why);
         }
 
         if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |c| {
             c.name("webblock");
             c.description("Create a block list for unwanted links");
-            c.default_permission(true);
+            c.default_member_permissions(Permissions::SEND_MESSAGES);
             c.create_option(|o| {
                 o.kind(ApplicationCommandOptionType::SubCommand);
                 o.name("help");
@@ -245,16 +230,17 @@ impl EventHandler for Handler {
                 o.name("status");
                 o.description("Current configuration status for this server")
             })
-        }).await {
+        })
+        .await
+        {
             println!("Unable to create slash command: {}", why);
-
         }
     }
 
-    async fn voice_state_update(&self, ctx: Context, guild_id: Option<GuildId>, old: Option<VoiceState>, new: VoiceState) {
-        if let Some(ref guild_id) = guild_id {
+    async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
+        if let Some(ref guild_id) = new.guild_id {
             if guild_id.as_u64() == &687876072045412560_u64 {
-               edbh::utils::voice_state_changed(&ctx, &guild_id, &old, &new).await;
+                edbh::utils::voice_state_changed(&ctx, &guild_id, &old, &new).await;
             }
         }
 
@@ -289,38 +275,29 @@ impl EventHandler for Handler {
         //         }
         //     }
         // }
-
-
-
     }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let configuration = read_configuration().unwrap();
 
-    let framework = StandardFramework::new().configure(
-        |c| c
-            .prefix("~")
-            .ignore_bots(true)
-            .with_whitespace(true)
-            .case_insensitivity(true)
-    )
+    let framework = StandardFramework::new()
+        .configure(|c| c.prefix("~").ignore_bots(true).with_whitespace(true).case_insensitivity(true))
         .group(&GENERAL_GROUP)
         .group(&MATH_GROUP)
         .group(&MODERATION_GROUP);
 
-    let mut client = Client::builder(configuration.discord_token)
+    let mut client = Client::builder(configuration.discord_token, GatewayIntents::all())
         .event_handler(Handler)
         .framework(framework)
-        .intents(GatewayIntents::all())
         .application_id(configuration.application_id.parse().unwrap())
         .await
         .expect("Error creating client");
 
     {
         let mut data = client.data.write().await;
-        let pool = get_sqlite_pool("sqlite://zangra.db").await?;
+        let pool = get_sqlite_pool("sqlite://zangra.sqlite").await?;
         data.insert::<DatabasePool>(pool);
     }
 

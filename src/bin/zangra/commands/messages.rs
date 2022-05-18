@@ -709,10 +709,10 @@ async fn role_selection_message_setup(ctx: &Context, guild_id: GuildId, channel_
     Ok(role_selector)
 }
 
-async fn await_message_reply(ctx: &Context, parent_message: Message) -> std::result::Result<String, String> {
+async fn await_message_reply(ctx: &Context, parent_message: Message) -> anyhow::Result<String> {
     let timeout = 60 * 5; //In seconds
 
-    let event_builder = EventCollectorBuilder::new(&ctx)
+    let mut event_collector = EventCollectorBuilder::new(&ctx)
         .add_event_type(EventType::MessageCreate)
         .add_channel_id(parent_message.channel_id)
         .filter(move |e| {
@@ -726,28 +726,25 @@ async fn await_message_reply(ctx: &Context, parent_message: Message) -> std::res
             }
             false
         })
-        .timeout(Duration::from_secs(timeout)).await;
+        .timeout(Duration::from_secs(timeout))
+        .build()?;
 
     let mut msg: String = String::from("");
     //Reply containing message
-    match event_builder {
-        Ok(mut ec) => {
-            if let Some(event) = ec.next().await {
-                match event.as_ref() {
-                    Event::MessageCreate(m) => {
-                        msg = m.message.content.clone();
-                        //discord sometimes hangs and doesn't delete the message
-                        //hopefully this slows it down enough for discord
-                        std::thread::sleep(Duration::from_secs(1));
-                        if let Err(why) = m.message.delete(&ctx).await {
-                            println!("{}", why);
-                        }
-                    }
-                    _ => {}
+
+    if let Some(event) = event_collector.next().await {
+        match event.as_ref() {
+            Event::MessageCreate(m) => {
+                msg = m.message.content.clone();
+                //discord sometimes hangs and doesn't delete the message
+                //hopefully this slows it down enough for discord
+                std::thread::sleep(Duration::from_secs(1));
+                if let Err(why) = m.message.delete(&ctx).await {
+                    println!("{}", why);
                 }
             }
+            _ => {}
         }
-        Err(err) => { return Err(err.to_string()); }
     }
 
     Ok(msg)

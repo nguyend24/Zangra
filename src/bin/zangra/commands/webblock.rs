@@ -17,7 +17,6 @@ use url::Url;
 use crate::DatabasePool;
 
 pub async fn webblock<>(ctx: &Context, aci: &ApplicationCommandInteraction) -> Result<()> {
-    println!("{}", &aci.data.name);
     for option in &aci.data.options {
         match option.name.as_str() {
             "enable" => {
@@ -334,7 +333,7 @@ async fn edit_command(ctx: &Context, aci: &ApplicationCommandInteraction) -> Res
                 })
             }).await.unwrap();
         }
-        Err(why) => { //There are no blocked sites
+        Err(_why) => { //There are no blocked sites
             aci.create_interaction_response(&ctx, |re| {
                 re.kind(InteractionResponseType::Modal);
                 re.interaction_response_data(|d| {
