@@ -81,6 +81,147 @@ fn read_configuration() -> Option<ConfigurationData> {
     }
 }
 
+async fn setup_slash_commands(ctx: &Context) {
+    if let Err(why) = Command::create_global_application_command(&ctx, |command| {
+        // command.default_member_permissions(Permissions::ADMINISTRATOR);
+
+        command.name("mutex");
+        command.description("Mutually exclusive roles");
+        command.create_option(|add| {
+            add.kind(CommandOptionType::SubCommand);
+            add.name("add");
+            add.description("Add a new mutually exclusive role pairing");
+
+            add.create_sub_option(|role| {
+                role.kind(CommandOptionType::Role);
+                role.name("role1");
+                role.description("Make role mutually exclusive");
+                role.required(true);
+                role
+            });
+
+            add.create_sub_option(|role| {
+                role.kind(CommandOptionType::Role);
+                role.name("role2");
+                role.description("Make role mutually exclusive");
+                role.required(true);
+                role
+            });
+
+            add
+        });
+        command.create_option(|remove| {
+            remove.kind(CommandOptionType::SubCommand);
+            remove.name("remove");
+            remove.description("Remove a mutually exclusive role pairing");
+
+            remove.create_sub_option(|role| {
+                role.kind(CommandOptionType::Role);
+                role.name("role1");
+                role.description("Make role mutually exclusive");
+                role.required(true);
+                role
+            });
+
+            remove.create_sub_option(|role| {
+                role.kind(CommandOptionType::Role);
+                role.name("role2");
+                role.description("Make role mutually exclusive");
+                role.required(true);
+                role
+            });
+
+            remove
+        });
+        command.create_option(|clear| {
+            clear.kind(CommandOptionType::SubCommand);
+            clear.name("clear");
+            clear.description("Remove all pairings");
+
+            clear
+        });
+        command.create_option(|list| {
+            list.kind(CommandOptionType::SubCommand);
+            list.name("list");
+            list.description("List currently exclusive role pairings");
+
+            list
+        });
+        command
+    })
+    .await
+{
+    println!("why: {}, mutex create error", why);
+};
+
+
+if let Err(why) = Command::create_global_application_command(&ctx, |command| {
+    command.name("Edit Role Selector");
+    command.kind(CommandType::Message)
+})
+.await
+{
+    println!("Unable to create slash command: {}", why);
+}
+
+if let Err(why) = Command::create_global_application_command(&ctx, |c| {
+    c.name("webblock");
+    c.description("Create a block list for unwanted links");
+    c.default_member_permissions(Permissions::SEND_MESSAGES);
+    c.create_option(|o| {
+        o.kind(CommandOptionType::SubCommand);
+        o.name("help");
+        o.description("Instructions for using link blocking feature")
+    });
+    c.create_option(|o| {
+        o.kind(CommandOptionType::SubCommand);
+        o.name("enable");
+        o.description("Turn on site blocking")
+    });
+    c.create_option(|o| {
+        o.kind(CommandOptionType::SubCommand);
+        o.name("disable");
+        o.description("Turn off site blocking")
+    });
+    c.create_option(|o| {
+        o.kind(CommandOptionType::SubCommand);
+        o.name("edit");
+        o.description("Edit the blocklist")
+    });
+    c.create_option(|logging| {
+        logging.kind(CommandOptionType::SubCommandGroup);
+        logging.name("log");
+        logging.description("Log when actions are taken");
+        logging.create_sub_option(|enable| {
+            enable.kind(CommandOptionType::SubCommand);
+            enable.name("enable");
+            enable.description("Turn on logging of actions taken");
+            enable.create_sub_option(|channel| {
+                channel.kind(CommandOptionType::Channel);
+                channel.name("channel");
+                channel.description("Choose channel to send log messages");
+                channel.required(true);
+                channel.channel_types(&[ChannelType::Text])
+            })
+        });
+        logging.create_sub_option(|disable| {
+            disable.kind(CommandOptionType::SubCommand);
+            disable.name("disable");
+            disable.description("Turn off logging of actions taken")
+        })
+    });
+    c.create_option(|o| {
+        o.kind(CommandOptionType::SubCommand);
+        o.name("status");
+        o.description("Current configuration status for this server")
+    })
+})
+.await
+{
+    println!("Unable to create slash command: {}", why);
+}
+}
+
 pub struct Handler;
 
 #[async_trait]
@@ -158,9 +299,6 @@ impl EventHandler for Handler {
         println!("{} is connected!", ready.user.name);
         println!("Version: {}", VERSION);
 
-        // let sorted_roles: Vec<String> = GuildId(697446762025320549).roles(&ctx).await.unwrap().into_values().sorted_by_key(|r| r.position).map(|r| r.name).collect();
-        // println!("{:?}", sorted_roles);
-
         if let Err(why) = ChannelId(773036830580408330)
             .send_message(&ctx, |m| {
                 m.embed(|e| {
@@ -180,144 +318,7 @@ impl EventHandler for Handler {
             println!("{}", why)
         };
 
-        if let Err(why) = Command::create_global_application_command(&ctx, |command| {
-                // command.default_member_permissions(Permissions::ADMINISTRATOR);
-
-                command.name("mutex");
-                command.description("Mutually exclusive roles");
-                command.create_option(|add| {
-                    add.kind(CommandOptionType::SubCommand);
-                    add.name("add");
-                    add.description("Add a new mutually exclusive role pairing");
-
-                    add.create_sub_option(|role| {
-                        role.kind(CommandOptionType::Role);
-                        role.name("role1");
-                        role.description("Make role mutually exclusive");
-                        role.required(true);
-                        role
-                    });
-
-                    add.create_sub_option(|role| {
-                        role.kind(CommandOptionType::Role);
-                        role.name("role2");
-                        role.description("Make role mutually exclusive");
-                        role.required(true);
-                        role
-                    });
-
-                    add
-                });
-                command.create_option(|remove| {
-                    remove.kind(CommandOptionType::SubCommand);
-                    remove.name("remove");
-                    remove.description("Remove a mutually exclusive role pairing");
-
-                    remove.create_sub_option(|role| {
-                        role.kind(CommandOptionType::Role);
-                        role.name("role1");
-                        role.description("Make role mutually exclusive");
-                        role.required(true);
-                        role
-                    });
-
-                    remove.create_sub_option(|role| {
-                        role.kind(CommandOptionType::Role);
-                        role.name("role2");
-                        role.description("Make role mutually exclusive");
-                        role.required(true);
-                        role
-                    });
-
-                    remove
-                });
-                command.create_option(|clear| {
-                    clear.kind(CommandOptionType::SubCommand);
-                    clear.name("clear");
-                    clear.description("Remove all pairings");
-
-                    clear
-                });
-                command.create_option(|list| {
-                    list.kind(CommandOptionType::SubCommand);
-                    list.name("list");
-                    list.description("List currently exclusive role pairings");
-
-                    list
-                });
-                command
-            })
-            .await
-        {
-            println!("why: {}, mutex create error", why);
-        };
-
-
-        if let Err(why) = Command::create_global_application_command(&ctx, |command| {
-            command.name("Edit Role Selector");
-            command.kind(CommandType::Message)
-        })
-        .await
-        {
-            println!("Unable to create slash command: {}", why);
-        }
-
-        if let Err(why) = Command::create_global_application_command(&ctx, |c| {
-            c.name("webblock");
-            c.description("Create a block list for unwanted links");
-            c.default_member_permissions(Permissions::SEND_MESSAGES);
-            c.create_option(|o| {
-                o.kind(CommandOptionType::SubCommand);
-                o.name("help");
-                o.description("Instructions for using link blocking feature")
-            });
-            c.create_option(|o| {
-                o.kind(CommandOptionType::SubCommand);
-                o.name("enable");
-                o.description("Turn on site blocking")
-            });
-            c.create_option(|o| {
-                o.kind(CommandOptionType::SubCommand);
-                o.name("disable");
-                o.description("Turn off site blocking")
-            });
-            c.create_option(|o| {
-                o.kind(CommandOptionType::SubCommand);
-                o.name("edit");
-                o.description("Edit the blocklist")
-            });
-            c.create_option(|logging| {
-                logging.kind(CommandOptionType::SubCommandGroup);
-                logging.name("log");
-                logging.description("Log when actions are taken");
-                logging.create_sub_option(|enable| {
-                    enable.kind(CommandOptionType::SubCommand);
-                    enable.name("enable");
-                    enable.description("Turn on logging of actions taken");
-                    enable.create_sub_option(|channel| {
-                        channel.kind(CommandOptionType::Channel);
-                        channel.name("channel");
-                        channel.description("Choose channel to send log messages");
-                        channel.required(true);
-                        channel.channel_types(&[ChannelType::Text])
-                    })
-                });
-                logging.create_sub_option(|disable| {
-                    disable.kind(CommandOptionType::SubCommand);
-                    disable.name("disable");
-                    disable.description("Turn off logging of actions taken")
-                })
-            });
-            c.create_option(|o| {
-                o.kind(CommandOptionType::SubCommand);
-                o.name("status");
-                o.description("Current configuration status for this server")
-            })
-        })
-        .await
-        {
-            println!("Unable to create slash command: {}", why);
-        }
+        setup_slash_commands(&ctx).await;
     }
 
     async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
