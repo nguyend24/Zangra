@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 use std::fmt::{Debug, Display, Formatter};
-use std::{fmt, result};
+use std::fmt;
 
 use serenity::Error as SerenityError;
 use serde_json::Error as JsonError;
@@ -12,7 +12,7 @@ pub struct ZangraError {
 }
 
 impl ZangraError {
-    pub fn new<S: Into<String>>(message: S) -> ZangraError{
+    pub fn _new<S: Into<String>>(message: S) -> ZangraError{
         ZangraError {
             message: message.into()
         }

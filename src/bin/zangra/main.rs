@@ -3,14 +3,13 @@ use serenity::{
     client::{Client, Context, EventHandler},
     framework::{standard::macros::group, StandardFramework},
     model::{
+        application::{
+            interaction::{Interaction},
+            command::{Command, CommandOptionType, CommandType},},
         channel::{ChannelType, Message, Reaction},
         gateway::{GatewayIntents, Ready},
         guild::{Member},
         id::{ChannelId},
-        interactions::{
-            application_command::{ApplicationCommand, ApplicationCommandOptionType, ApplicationCommandType},
-            Interaction,
-        },
         permissions::Permissions,
         voice::VoiceState,
     },
@@ -45,7 +44,7 @@ mod utils;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const TEST_SERVER_ID: &u64 = &373993407741427713_u64;
+const _TEST_SERVER_ID: &u64 = &373993407741427713_u64;
 
 #[group]
 #[commands(ping, invis, online, timestamp)]
@@ -143,7 +142,7 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn message(&self, ctx: Context, new_message: Message) {
+    async fn message(&self, _ctx: Context, _new_message: Message) {
         // if !new_message.author.bot {
         //     if let Err(why) = webblock_check_message(&ctx, &new_message).await {
         //         println!("Error webblock_check_message: {}", why);
@@ -181,18 +180,18 @@ impl EventHandler for Handler {
             println!("{}", why)
         };
 
-        if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |command| {
+        if let Err(why) = Command::create_global_application_command(&ctx, |command| {
                 // command.default_member_permissions(Permissions::ADMINISTRATOR);
 
                 command.name("mutex");
                 command.description("Mutually exclusive roles");
                 command.create_option(|add| {
-                    add.kind(ApplicationCommandOptionType::SubCommand);
+                    add.kind(CommandOptionType::SubCommand);
                     add.name("add");
                     add.description("Add a new mutually exclusive role pairing");
 
                     add.create_sub_option(|role| {
-                        role.kind(ApplicationCommandOptionType::Role);
+                        role.kind(CommandOptionType::Role);
                         role.name("role1");
                         role.description("Make role mutually exclusive");
                         role.required(true);
@@ -200,7 +199,7 @@ impl EventHandler for Handler {
                     });
 
                     add.create_sub_option(|role| {
-                        role.kind(ApplicationCommandOptionType::Role);
+                        role.kind(CommandOptionType::Role);
                         role.name("role2");
                         role.description("Make role mutually exclusive");
                         role.required(true);
@@ -210,12 +209,12 @@ impl EventHandler for Handler {
                     add
                 });
                 command.create_option(|remove| {
-                    remove.kind(ApplicationCommandOptionType::SubCommand);
+                    remove.kind(CommandOptionType::SubCommand);
                     remove.name("remove");
                     remove.description("Remove a mutually exclusive role pairing");
 
                     remove.create_sub_option(|role| {
-                        role.kind(ApplicationCommandOptionType::Role);
+                        role.kind(CommandOptionType::Role);
                         role.name("role1");
                         role.description("Make role mutually exclusive");
                         role.required(true);
@@ -223,7 +222,7 @@ impl EventHandler for Handler {
                     });
 
                     remove.create_sub_option(|role| {
-                        role.kind(ApplicationCommandOptionType::Role);
+                        role.kind(CommandOptionType::Role);
                         role.name("role2");
                         role.description("Make role mutually exclusive");
                         role.required(true);
@@ -233,14 +232,14 @@ impl EventHandler for Handler {
                     remove
                 });
                 command.create_option(|clear| {
-                    clear.kind(ApplicationCommandOptionType::SubCommand);
+                    clear.kind(CommandOptionType::SubCommand);
                     clear.name("clear");
                     clear.description("Remove all pairings");
 
                     clear
                 });
                 command.create_option(|list| {
-                    list.kind(ApplicationCommandOptionType::SubCommand);
+                    list.kind(CommandOptionType::SubCommand);
                     list.name("list");
                     list.description("List currently exclusive role pairings");
 
@@ -254,49 +253,49 @@ impl EventHandler for Handler {
         };
 
 
-        if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |command| {
+        if let Err(why) = Command::create_global_application_command(&ctx, |command| {
             command.name("Edit Role Selector");
-            command.kind(ApplicationCommandType::Message)
+            command.kind(CommandType::Message)
         })
         .await
         {
             println!("Unable to create slash command: {}", why);
         }
 
-        if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |c| {
+        if let Err(why) = Command::create_global_application_command(&ctx, |c| {
             c.name("webblock");
             c.description("Create a block list for unwanted links");
             c.default_member_permissions(Permissions::SEND_MESSAGES);
             c.create_option(|o| {
-                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.kind(CommandOptionType::SubCommand);
                 o.name("help");
                 o.description("Instructions for using link blocking feature")
             });
             c.create_option(|o| {
-                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.kind(CommandOptionType::SubCommand);
                 o.name("enable");
                 o.description("Turn on site blocking")
             });
             c.create_option(|o| {
-                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.kind(CommandOptionType::SubCommand);
                 o.name("disable");
                 o.description("Turn off site blocking")
             });
             c.create_option(|o| {
-                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.kind(CommandOptionType::SubCommand);
                 o.name("edit");
                 o.description("Edit the blocklist")
             });
             c.create_option(|logging| {
-                logging.kind(ApplicationCommandOptionType::SubCommandGroup);
+                logging.kind(CommandOptionType::SubCommandGroup);
                 logging.name("log");
                 logging.description("Log when actions are taken");
                 logging.create_sub_option(|enable| {
-                    enable.kind(ApplicationCommandOptionType::SubCommand);
+                    enable.kind(CommandOptionType::SubCommand);
                     enable.name("enable");
                     enable.description("Turn on logging of actions taken");
                     enable.create_sub_option(|channel| {
-                        channel.kind(ApplicationCommandOptionType::Channel);
+                        channel.kind(CommandOptionType::Channel);
                         channel.name("channel");
                         channel.description("Choose channel to send log messages");
                         channel.required(true);
@@ -304,13 +303,13 @@ impl EventHandler for Handler {
                     })
                 });
                 logging.create_sub_option(|disable| {
-                    disable.kind(ApplicationCommandOptionType::SubCommand);
+                    disable.kind(CommandOptionType::SubCommand);
                     disable.name("disable");
                     disable.description("Turn off logging of actions taken")
                 })
             });
             c.create_option(|o| {
-                o.kind(ApplicationCommandOptionType::SubCommand);
+                o.kind(CommandOptionType::SubCommand);
                 o.name("status");
                 o.description("Current configuration status for this server")
             })
