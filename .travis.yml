@@ -3,3 +3,5 @@ rust:
   - stable
 os:
   - linux
+  env:
+  - DATABASE_URL="sqlite:zangra.db"
