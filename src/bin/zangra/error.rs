@@ -6,7 +6,6 @@ use serenity::Error as SerenityError;
 use serde_json::Error as JsonError;
 use sqlx::Error as SqlxError;
 
-pub type Result<T> = result::Result<T, Error>;
 
 pub struct ZangraError {
     message: String,

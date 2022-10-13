@@ -5,8 +5,8 @@ use serenity::{
     model::{
         channel::{ChannelType, Message, Reaction},
         gateway::{GatewayIntents, Ready},
-        guild::Member,
-        id::{ChannelId, GuildId},
+        guild::{Member},
+        id::{ChannelId},
         interactions::{
             application_command::{ApplicationCommand, ApplicationCommandOptionType, ApplicationCommandType},
             Interaction,
@@ -19,7 +19,7 @@ use serenity::{
 
 use std::env;
 
-use commands::{math::*, messages::*, meta::*, ping::*, test::*};
+use commands::{math::*, messages::*, meta::*, ping::*, role::{mutex, check_mutex_roles}, test::*};
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_member_welcome_message, add_role_rules_verified};
 use std::fs::File;
@@ -30,7 +30,7 @@ use serde::{
     Serialize,
 };
 
-use crate::commands::webblock::{edit_interaction, webblock, webblock_check_message};
+// use crate::commands::webblock::{edit_interaction, webblock, webblock_check_message};
 
 use crate::utils::database::{get_sqlite_pool, DatabasePool};
 
@@ -93,54 +93,62 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = &interaction {
-            // if let Err(why) = command.create_interaction_response(&ctx, |re| {
-            //     re.kind(InteractionResponseType::DeferredChannelMessageWithSource)
-            // }).await {
-            //     println!("Cannot respond to slash command: {}", why);
-            // };
+    async fn guild_member_update(&self, ctx: Context, old: Option<Member>, new: Member) {
+        if let Err(why) = check_mutex_roles(&ctx, &old.as_ref(), &mut new.clone()).await {
+            println!("Error check mutex roles: {}", why);
+        }
+    }
 
-            match command.data.name.as_str() {
-                "createroleselector" => {
-                    // command.get_interaction_response(&ctx).await.unwrap().delete(&ctx).await;
-                    createroleselectorslash(&ctx, &command).await;
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        match interaction {
+            Interaction::ApplicationCommand(ac) => {
+                match ac.data.name.as_str() {
+                    "createroleselector" => {
+                        // command.get_interaction_response(&ctx).await.unwrap().delete(&ctx).await;
+                        createroleselectorslash(&ctx, &ac).await.unwrap();
+                    }
+                    "mutex" => {
+                        if let Err(why) = mutex(&ctx, &ac).await {
+                            
+                            println!("Error with mutex command, why: {}", why);
+                        };
+                    }
+                    "webblock" => {
+                        // webblock(&ctx, &ac).await.unwrap();
+                    }
+                    "Edit Role Selector" => {
+                        if let Err(why) = edit_role_selector(&ctx, &ac).await {
+                            println!("Unable to edit role selector: {}", why);
+                        };
+                    }
+
+                    _ => {}
                 }
-                "webblock" => {
-                    webblock(&ctx, command).await.unwrap();
-                }
-                "Edit Role Selector" => {
-                    if let Err(why) = edit_role_selector(&ctx, &command).await {
-                        println!("Unable to edit role selector: {}", why);
+            }
+            Interaction::MessageComponent(mc) => match mc.data.custom_id.as_str() {
+                "selectmenu" => {
+                    if let Err(why) = autorole_selections(&ctx, &mc).await {
+                        println!("autorole_selection err: {}", why);
                     };
                 }
-
                 _ => {}
-            }
-        } else if let Interaction::MessageComponent(mc) = &interaction {
-            match mc.data.custom_id.as_str() {
-                "selectmenu" => {
-                    autorole_selections(&ctx, &interaction).await.unwrap();
-                }
-                _ => {}
-            }
-        } else if let Interaction::ModalSubmit(msi) = &interaction {
-            match msi.data.custom_id.as_str().split(" ").next().unwrap_or("{}") {
-                "webblockedit" => {
-                    edit_interaction(&ctx, &msi).await.unwrap();
-                }
-                _ => {}
-            }
-        } else {
+            },
+            // Interaction::ModalSubmit(msi) => match msi.data.custom_id.as_str().split(" ").next().unwrap_or("{}") {
+            //     "webblockedit" => {
+            //         edit_interaction(&ctx, &msi).await.unwrap();
+            //     }
+            //     _ => {}
+            // },
+            _ => {}
         }
     }
 
     async fn message(&self, ctx: Context, new_message: Message) {
-        if !new_message.author.bot {
-            if let Err(why) = webblock_check_message(&ctx, &new_message).await {
-                println!("Error webblock_check_message: {}", why);
-            }
-        }
+        // if !new_message.author.bot {
+        //     if let Err(why) = webblock_check_message(&ctx, &new_message).await {
+        //         println!("Error webblock_check_message: {}", why);
+        //     }
+        // }
     }
 
     async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
@@ -150,6 +158,9 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
         println!("Version: {}", VERSION);
+
+        // let sorted_roles: Vec<String> = GuildId(697446762025320549).roles(&ctx).await.unwrap().into_values().sorted_by_key(|r| r.position).map(|r| r.name).collect();
+        // println!("{:?}", sorted_roles);
 
         if let Err(why) = ChannelId(773036830580408330)
             .send_message(&ctx, |m| {
@@ -169,6 +180,79 @@ impl EventHandler for Handler {
         {
             println!("{}", why)
         };
+
+        if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |command| {
+                // command.default_member_permissions(Permissions::ADMINISTRATOR);
+
+                command.name("mutex");
+                command.description("Mutually exclusive roles");
+                command.create_option(|add| {
+                    add.kind(ApplicationCommandOptionType::SubCommand);
+                    add.name("add");
+                    add.description("Add a new mutually exclusive role pairing");
+
+                    add.create_sub_option(|role| {
+                        role.kind(ApplicationCommandOptionType::Role);
+                        role.name("role1");
+                        role.description("Make role mutually exclusive");
+                        role.required(true);
+                        role
+                    });
+
+                    add.create_sub_option(|role| {
+                        role.kind(ApplicationCommandOptionType::Role);
+                        role.name("role2");
+                        role.description("Make role mutually exclusive");
+                        role.required(true);
+                        role
+                    });
+
+                    add
+                });
+                command.create_option(|remove| {
+                    remove.kind(ApplicationCommandOptionType::SubCommand);
+                    remove.name("remove");
+                    remove.description("Remove a mutually exclusive role pairing");
+
+                    remove.create_sub_option(|role| {
+                        role.kind(ApplicationCommandOptionType::Role);
+                        role.name("role1");
+                        role.description("Make role mutually exclusive");
+                        role.required(true);
+                        role
+                    });
+
+                    remove.create_sub_option(|role| {
+                        role.kind(ApplicationCommandOptionType::Role);
+                        role.name("role2");
+                        role.description("Make role mutually exclusive");
+                        role.required(true);
+                        role
+                    });
+
+                    remove
+                });
+                command.create_option(|clear| {
+                    clear.kind(ApplicationCommandOptionType::SubCommand);
+                    clear.name("clear");
+                    clear.description("Remove all pairings");
+
+                    clear
+                });
+                command.create_option(|list| {
+                    list.kind(ApplicationCommandOptionType::SubCommand);
+                    list.name("list");
+                    list.description("List currently exclusive role pairings");
+
+                    list
+                });
+                command
+            })
+            .await
+        {
+            println!("why: {}, mutex create error", why);
+        };
+
 
         if let Err(why) = ApplicationCommand::create_global_application_command(&ctx, |command| {
             command.name("Edit Role Selector");
@@ -297,7 +381,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     {
         let mut data = client.data.write().await;
-        let pool = get_sqlite_pool("sqlite://zangra.sqlite").await?;
+        let pool = get_sqlite_pool("sqlite://zangra.db").await?;
+        sqlx::migrate!("./migrations").run(&pool).await?;
         data.insert::<DatabasePool>(pool);
     }
 
