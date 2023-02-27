@@ -77,7 +77,7 @@ fn read_configuration() -> Option<ConfigurationData> {
         }
 
         Err(why) => {
-            println!("Unable to open config file. Why: {}", why);
+            println!("Unable to open config file. Why: {why}");
             None
         }
     }
@@ -153,7 +153,7 @@ async fn setup_slash_commands(ctx: &Context) {
     })
     .await
 {
-    println!("why: {}, mutex create error", why);
+    println!("why: {why}, mutex create error");
 };
 
 
@@ -163,7 +163,7 @@ if let Err(why) = Command::create_global_application_command(&ctx, |command| {
 })
 .await
 {
-    println!("Unable to create slash command: {}", why);
+    println!("Unable to create slash command: {why}");
 }
 
 if let Err(why) = Command::create_global_application_command(&ctx, |c| {
@@ -220,7 +220,7 @@ if let Err(why) = Command::create_global_application_command(&ctx, |c| {
 })
 .await
 {
-    println!("Unable to create slash command: {}", why);
+    println!("Unable to create slash command: {why}");
 }
 }
 
@@ -237,7 +237,7 @@ impl EventHandler for Handler {
 
     async fn guild_member_update(&self, ctx: Context, old: Option<Member>, new: Member) {
         if let Err(why) = check_mutex_roles(&ctx, &old.as_ref(), &mut new.clone()).await {
-            println!("Error check mutex roles: {}", why);
+            println!("Error check mutex roles: {why}");
         }
     }
 
@@ -252,7 +252,7 @@ impl EventHandler for Handler {
                     "mutex" => {
                         if let Err(why) = mutex(&ctx, &ac).await {
                             
-                            println!("Error with mutex command, why: {}", why);
+                            println!("Error with mutex command, why: {why}");
                         };
                     }
                     "webblock" => {
@@ -260,7 +260,7 @@ impl EventHandler for Handler {
                     }
                     "Edit Role Selector" => {
                         if let Err(why) = edit_role_selector(&ctx, &ac).await {
-                            println!("Unable to edit role selector: {}", why);
+                            println!("Unable to edit role selector: {why}");
                         };
                     }
 
@@ -299,7 +299,7 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
-        println!("Version: {}", VERSION);
+        println!("Version: {VERSION}");
 
         if let Err(why) = ChannelId(773036830580408330)
             .send_message(&ctx, |m| {
@@ -317,7 +317,7 @@ impl EventHandler for Handler {
             })
             .await
         {
-            println!("{}", why)
+            println!("{why}")
         };
 
         setup_slash_commands(&ctx).await;
@@ -328,7 +328,7 @@ impl EventHandler for Handler {
     async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
         if let Some(ref guild_id) = new.guild_id {
             if guild_id.as_u64() == &687876072045412560_u64 {
-                edbh::utils::voice_state_changed(&ctx, &guild_id, &old, &new).await;
+                edbh::utils::voice_state_changed(&ctx, guild_id, &old, &new).await;
             }
         }
 
@@ -406,7 +406,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     if let Err(why) = client.start().await {
-        println!("Client error: {:?}", why);
+        println!("Client error: {why:?}");
     }
 
     Ok(())

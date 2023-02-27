@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::collections::HashSet;
 
 use crate::utils::database::DatabasePool;
@@ -27,7 +26,7 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
         .ok_or(anyhow!("Can't retrieve member permissions"))?;
 
     if !member_permissions.administrator()
-        && !(&member.user.id.as_u64() == &213709744261693442_u64.borrow())
+        && member.user.id.as_u64() != &213709744261693442_u64
     {
         command
             .create_interaction_response(&ctx, |response| {
@@ -109,7 +108,7 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
                                 response.interaction_response_data(|data| {
                                     data.ephemeral(true);
                                     print!("r1: {}, r2: {}", &r1, &r2);
-                                    data.content(format!("Pairing already exists"));
+                                    data.content("Pairing already exists".to_string());
 
                                     data
                                 });
@@ -135,11 +134,11 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
                 .await?;
 
                 let role1_name = RoleId(arg_role1 as u64)
-                    .to_role_cached(&ctx)
+                    .to_role_cached(ctx)
                     .ok_or(anyhow!("Error getting role"))?
                     .name;
                 let role2_name = RoleId(arg_role2 as u64)
-                    .to_role_cached(&ctx)
+                    .to_role_cached(ctx)
                     .ok_or(anyhow!("Error getting role"))?
                     .name;
 
@@ -150,8 +149,7 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
                             data.ephemeral(true);
                             data.embed(|e| {
                                 e.title(format!(
-                                    "{} and {} have been added as mutually exclusive roles",
-                                    role1_name, role2_name
+                                    "{role1_name} and {role2_name} have been added as mutually exclusive roles"
                                 ));
                                 e
                             });
@@ -187,23 +185,22 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
                 let result2 = query!("DELETE FROM MutuallyExclusiveRole WHERE GuildId = ? AND role1 = ? AND role2 = ?", guild_id_i64, arg_role2, arg_role1).execute(&pool).await?;
 
                 let role1_name = RoleId(arg_role1 as u64)
-                    .to_role_cached(&ctx)
+                    .to_role_cached(ctx)
                     .ok_or(anyhow!("Error getting role"))?
                     .name;
                 let role2_name = RoleId(arg_role2 as u64)
-                    .to_role_cached(&ctx)
+                    .to_role_cached(ctx)
                     .ok_or(anyhow!("Error getting role"))?
                     .name;
 
                 let title = match result1.rows_affected() + result2.rows_affected() {
                     //if at least 1 row affected, then mutex pair exists
                     0 => {
-                        format!("{} and {} are not mutex roles", role1_name, role2_name)
+                        format!("{role1_name} and {role2_name} are not mutex roles")
                     }
                     _ => {
                         format!(
-                            "{} and {} have been removed as mutex roles",
-                            role1_name, role2_name
+                            "{role1_name} and {role2_name} have been removed as mutex roles"
                         )
                     }
                 };
@@ -251,11 +248,10 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
                     })
                     .await?;
 
-                let guild_id = command
+                let guild_id = *command
                     .guild_id
                     .ok_or(anyhow!("Can't get guild id"))?
-                    .as_u64()
-                    .clone() as i64;
+                    .as_u64() as i64;
                 query!(
                     "DELETE FROM MutuallyExclusiveRole WHERE GuildId = ?",
                     guild_id
@@ -265,11 +261,10 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
             }
             "list" => {
                 //list out all pairings for this server
-                let guild_id = command
+                let guild_id = *command
                     .guild_id
                     .ok_or(anyhow!("Can't get guild ID for mutex list"))?
-                    .as_u64()
-                    .clone() as i64;
+                    .as_u64() as i64;
 
                 let mutex_pairs = query!(
                     "SELECT * FROM MutuallyExclusiveRole WHERE GuildId = ?",
@@ -284,16 +279,16 @@ pub async fn mutex(ctx: &Context, command: &ApplicationCommandInteraction) -> Re
                     .map(|r| {
                         //convert role ids into full roles with information
                         let role1 = RoleId(r.role1.unwrap() as u64)
-                            .to_role_cached(&ctx)
+                            .to_role_cached(ctx)
                             .ok_or(anyhow!("unable to get data for role1 in mutex list"));
                         let role2 = RoleId(r.role2.unwrap() as u64)
-                            .to_role_cached(&ctx)
+                            .to_role_cached(ctx)
                             .ok_or(anyhow!("unable to get information for role2 in mutex list"));
 
                         if role1.is_ok() && role2.is_ok() {
-                            return format!("{} - {}", role1.unwrap().name, role2.unwrap().name);
+                            format!("{} - {}", role1.unwrap().name, role2.unwrap().name)
                         } else {
-                            return "".to_string();
+                            "".to_string()
                         }
                     })
                     .reduce(|r1, r2| r1 + "\n" + &r2)
@@ -354,7 +349,7 @@ pub async fn check_mutex_roles(
 
     let guild_name = new_member_data
         .guild_id
-        .name(&ctx)
+        .name(ctx)
         .unwrap_or("Can't get guild name for mutex check".to_string());
 
     for role in role_diff {

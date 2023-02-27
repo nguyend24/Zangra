@@ -11,7 +11,7 @@ pub async fn timestamp(ctx: &Context, message: &Message, _args: Args) -> Command
         .embed(|e| e
             .title("Current time")
             .field("Time", time, false))).await {
-        println!("Error sending timestamp: {}", why);
+        println!("Error sending timestamp: {why}");
     }
 
     Ok(())

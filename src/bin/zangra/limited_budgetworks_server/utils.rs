@@ -15,7 +15,7 @@ pub async fn add_member_join_role(ctx: &Context, new_member: &Member) {
     let role_to_add = RoleId(FOUR_HORSEMAN_ROLE_ID);
     let mut member = new_member.clone();
     if let Err(why) = member.add_role(ctx, role_to_add).await {
-        println!("Error adding role: {:?}", why);
+        println!("Error adding role: {why:?}");
     }
 }
 
@@ -26,7 +26,7 @@ pub async fn add_member_welcome_message(ctx: &Context, new_member: &Member) {
     if let Err(why) = ChannelId(714692215577772085).send_message(ctx, |m| m.embed(|e|
         e.description(description)
             .image("https://media.discordapp.net/attachments/714340993129906306/729584384822476890/LBW_HI.gif"))).await {
-        println!("Error sending LimitedBudgetworks welcome message. Why: {}", why);
+        println!("Error sending LimitedBudgetworks welcome message. Why: {why}");
     };
 }
 
@@ -50,13 +50,13 @@ pub async fn add_role_rules_verified(ctx: &Context, add_reaction: &Reaction) {
         let mut reaction_member = match ctx.http.get_member(*guild_id.as_u64(), *user_id.as_u64()).await {
             Ok(member) => member,
             Err(why) => {
-                println!("add_role_rules_verified - member not found, Why: {}", why);
+                println!("add_role_rules_verified - member not found, Why: {why}");
                 return;
             }
         };
         let role_to_add = RoleId(FOUR_HORSEMAN_ROLE_ID);
         if let Err(why) = reaction_member.add_role(ctx, role_to_add).await {
-            println!("Error adding role: {:?}", why);
+            println!("Error adding role: {why:?}");
         }
     }
 }
@@ -124,6 +124,6 @@ pub async fn _print_rules(ctx: &Context) {
         })
             .reactions(vec![ReactionType::Unicode(String::from("✅"))])
     }).await {
-        println!("Error sending message: print_rules(): {}", why);
+        println!("Error sending message: print_rules(): {why}");
     }
 }

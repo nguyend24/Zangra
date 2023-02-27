@@ -107,7 +107,7 @@ pub async fn edit_role_selector<'a, C: Into<&'a Context>>(
                     let role_selector = role_selection_message_setup(
                         ctx,
                         guild_id,
-                        channel_id.clone(),
+                        *channel_id,
                         Some(message.clone()),
                     )
                     .await
@@ -129,7 +129,7 @@ pub async fn edit_role_selector<'a, C: Into<&'a Context>>(
                 }
             }
             Err(why) => {
-                println!("{}", why);
+                println!("{why}");
             }
         }
     }
@@ -187,7 +187,7 @@ pub async fn autorole_selections(ctx: &Context, mc: &MessageComponentInteraction
                             let remove: Vec<RoleId> = all_items
                                 .difference(&selected_items)
                                 .filter(|role| member_roles.contains(role))
-                                .map(|role| role.clone())
+                                .copied()
                                 .collect();
                             let add: Vec<RoleId> = selected_items
                                 .into_iter()
@@ -215,8 +215,8 @@ pub async fn autorole_selections(ctx: &Context, mc: &MessageComponentInteraction
 pub async fn createroleselection(ctx: &Context, msg: &Message) -> CommandResult {
     if let Ok(role_selector) = role_selection_message_setup(
         ctx,
-        msg.guild_id.unwrap().clone(),
-        msg.channel_id.clone(),
+        msg.guild_id.unwrap(),
+        msg.channel_id,
         None,
     )
     .await
@@ -226,7 +226,7 @@ pub async fn createroleselection(ctx: &Context, msg: &Message) -> CommandResult 
 
         let role_selector_msg = role_selector.setup_message;
         sqlx::query("insert into AutoRoleMessage (AutoRoleMessageId) values (?)")
-            .bind(role_selector_msg.id.as_u64().clone() as i64)
+            .bind(*role_selector_msg.id.as_u64() as i64)
             .execute(&pool)
             .await
             .unwrap();
@@ -256,14 +256,14 @@ pub async fn createroleselectorslash(
     let channel_id = command.channel_id;
 
     if let Ok(role_selector) =
-        role_selection_message_setup(&ctx, guild_id.clone(), channel_id.clone(), None).await
+        role_selection_message_setup(ctx, guild_id, channel_id, None).await
     {
         let data = ctx.data.read().await;
         let pool = data.get::<DatabasePool>().unwrap().clone();
 
         let role_selector_msg = role_selector.setup_message;
         sqlx::query("insert into AutoRoleMessage (AutoRoleMessageId) values (?)")
-            .bind(role_selector_msg.id.as_u64().clone() as i64)
+            .bind(*role_selector_msg.id.as_u64() as i64)
             .execute(&pool)
             .await
             .unwrap();
@@ -370,7 +370,7 @@ async fn role_selection_message_setup(
                 b.custom_id("continue");
                 b.label("Continue");
                 b.style(ButtonStyle::Primary);
-                if selected_roles.len() == 0 {
+                if selected_roles.is_empty() {
                     b.disabled(true);
                 }
                 b
@@ -406,86 +406,83 @@ async fn role_selection_message_setup(
 
     loop {
         let interaction = setup_message
-            .await_component_interaction(&ctx)
+            .await_component_interaction(ctx)
             .timeout(Duration::from_secs(60 * 10))
             .await;
 
-        match interaction {
-            Some(mc) => {
-                mc.create_interaction_response(&ctx, |re| {
-                    re.kind(InteractionResponseType::DeferredUpdateMessage)
-                })
-                .await?;
+        if let Some(mc)  = interaction {
+            mc.create_interaction_response(&ctx, |re| {
+                re.kind(InteractionResponseType::DeferredUpdateMessage)
+            })
+            .await?;
 
-                if mc.data.custom_id.as_str() == "continue" {
-                    break;
+            if mc.data.custom_id.as_str() == "continue" {
+                break;
+            }
+
+            match mc.data.custom_id.as_str() {
+                "previous_page" => {
+                    //retreat the selection list, everything else stays the same
+                    page_index -= 1;
                 }
+                "next_page" => {
+                    //advance the selection list, everything else stays the same
+                    page_index += 1;
+                }
+                "cancel" => {
+                    setup_message.delete(&ctx).await?;
+                    return Err(anyhow!("cancel"));
+                }
+                "select_guild_roles" => {
+                    //user has selected items from the list, update selected roles and update display
+                    mc.data.values.iter().for_each(|r| {
+                        println!(
+                            "{}",
+                            guild_roles
+                                .get(&RoleId(r.parse().unwrap()))
+                                .unwrap()
+                                .name
+                                .as_str()
+                        );
+                        if !selected_roles.contains(&RoleId(r.parse().unwrap())) {
+                            selected_roles.push(RoleId(r.parse().unwrap()));
+                        }
+                    });
 
-                match mc.data.custom_id.as_str() {
-                    "previous_page" => {
-                        //retreat the selection list, everything else stays the same
-                        page_index -= 1;
-                    }
-                    "next_page" => {
-                        //advance the selection list, everything else stays the same
-                        page_index += 1;
-                    }
-                    "cancel" => {
-                        setup_message.delete(&ctx).await?;
-                        return Err(anyhow!("cancel"));
-                    }
-                    "select_guild_roles" => {
-                        //user has selected items from the list, update selected roles and update display
-                        mc.data.values.iter().for_each(|r| {
-                            println!(
-                                "{}",
-                                guild_roles
-                                    .get(&RoleId(r.parse().unwrap()))
-                                    .unwrap()
-                                    .name
-                                    .as_str()
-                            );
-                            if !selected_roles.contains(&RoleId(r.parse().unwrap())) {
-                                selected_roles.push(RoleId(r.parse().unwrap()));
-                            }
-                        });
-
-                        for (i, roleid) in guild_roles.keys().sorted().enumerate() {
-                            if page_index * list_max <= i && i < (page_index * list_max) + list_max
-                            {
-                                //if roleid isn't in values, remove from selected_roles
-                                if !mc.data.values.contains(&roleid.to_string()) {
-                                    //remove from selected_roles
-                                    if let Some(i) = selected_roles.iter().position(|p| p == roleid)
-                                    {
-                                        selected_roles.remove(i);
-                                    }
+                    for (i, roleid) in guild_roles.keys().sorted().enumerate() {
+                        if page_index * list_max <= i && i < (page_index * list_max) + list_max
+                        {
+                            //if roleid isn't in values, remove from selected_roles
+                            if !mc.data.values.contains(&roleid.to_string()) {
+                                //remove from selected_roles
+                                if let Some(i) = selected_roles.iter().position(|p| p == roleid)
+                                {
+                                    selected_roles.remove(i);
                                 }
                             }
                         }
                     }
-                    _ => {}
                 }
-
-                setup_message
-                    .edit(&ctx, |m| {
-                        m.set_embed(role_selection_prompt(&page_index, &selected_roles));
-                        m.components(|c| {
-                            c.add_action_row(role_selection_buttons_action_row(
-                                &page_index,
-                                &selected_roles,
-                            ));
-                            c.add_action_row(role_selection_menu(
-                                &guild_roles,
-                                &page_index,
-                                &list_max,
-                                &selected_roles,
-                            ))
-                        })
-                    })
-                    .await?;
+                _ => {}
             }
-            None => {}
+
+            setup_message
+                .edit(&ctx, |m| {
+                    m.set_embed(role_selection_prompt(&page_index, &selected_roles));
+                    m.components(|c| {
+                        c.add_action_row(role_selection_buttons_action_row(
+                            &page_index,
+                            &selected_roles,
+                        ));
+                        c.add_action_row(role_selection_menu(
+                            &guild_roles,
+                            &page_index,
+                            &list_max,
+                            &selected_roles,
+                        ))
+                    })
+                })
+                .await?;
         }
     }
 
@@ -517,7 +514,7 @@ async fn role_selection_message_setup(
 
     {
         let interaction = setup_message
-            .await_component_interaction(&ctx)
+            .await_component_interaction(ctx)
             .timeout(Duration::from_secs(60 * 10))
             .await
             .unwrap();
@@ -575,7 +572,7 @@ async fn role_selection_message_setup(
                     .await?;
 
                 let interaction = setup_message
-                    .await_component_interaction(&ctx)
+                    .await_component_interaction(ctx)
                     .timeout(Duration::from_secs(60 * 10))
                     .await
                     .unwrap();
@@ -628,61 +625,54 @@ async fn role_selection_message_setup(
 
     let mut role_descriptions: HashMap<RoleId, String> = HashMap::new();
 
-    match setup_message
-        .await_component_interaction(&ctx)
-        .timeout(Duration::from_secs(60 * 10))
-        .await
-    {
-        Some(mc) => {
-            mc.create_interaction_response(&ctx, |re| {
-                re.kind(InteractionResponseType::DeferredUpdateMessage)
-            })
-            .await?;
+    if let Some(mc) = setup_message
+    .await_component_interaction(ctx)
+    .timeout(Duration::from_secs(60 * 10))
+    .await {
+        mc.create_interaction_response(&ctx, |re| {
+            re.kind(InteractionResponseType::DeferredUpdateMessage)
+        })
+        .await?;
 
-            match mc.data.custom_id.as_str() {
-                "yes" => {
-                    //for each role, ask for a reply with the description to set
-                    for roleid in &selected_roles {
-                        let role = guild_roles
-                            .get(&roleid)
-                            .expect("Unable to map RoleId to Role");
-                        setup_message
-                            .edit(&ctx, |m| {
-                                m.embed(|e| {
-                                    e.title(format!(
-                                        "Reply with a description for the role: {}",
-                                        role.name.as_str()
-                                    ))
-                                });
-                                m.components(|c| c.set_action_rows(vec![]))
-                            })
-                            .await?;
+        match mc.data.custom_id.as_str() {
+            "yes" => {
+                //for each role, ask for a reply with the description to set
+                for roleid in &selected_roles {
+                    let role = guild_roles
+                        .get(roleid)
+                        .expect("Unable to map RoleId to Role");
+                    setup_message
+                        .edit(&ctx, |m| {
+                            m.embed(|e| {
+                                e.title(format!(
+                                    "Reply with a description for the role: {}",
+                                    role.name.as_str()
+                                ))
+                            });
+                            m.components(|c| c.set_action_rows(vec![]))
+                        })
+                        .await?;
 
-                        let description = await_message_reply(&ctx, setup_message.clone())
-                            .await
-                            .expect("Unable to get a description response");
+                    let description = await_message_reply(ctx, setup_message.clone())
+                        .await
+                        .expect("Unable to get a description response");
 
-                        role_descriptions.insert(roleid.clone(), description);
-                    }
-                }
-                "no" => {}
-                "cancel" => {
-                    setup_message.delete(&ctx).await?;
-                    return Err(anyhow!("cancel"));
-                }
-                _ => {
-                    //should not happen
-                    println!(
-                        "Unknown custom_id: {}, line: {}",
-                        mc.data.custom_id.as_str(),
-                        line!()
-                    );
+                    role_descriptions.insert(*roleid, description);
                 }
             }
-        }
-        None => {
-            //delete message and error out
-            //TODO
+            "no" => {}
+            "cancel" => {
+                setup_message.delete(&ctx).await?;
+                return Err(anyhow!("cancel"));
+            }
+            _ => {
+                //should not happen
+                println!(
+                    "Unknown custom_id: {}, line: {}",
+                    mc.data.custom_id.as_str(),
+                    line!()
+                );
+            }
         }
     }
 
@@ -712,19 +702,15 @@ async fn role_selection_message_setup(
         .await?;
 
     let mut max_selection = 0;
-    match setup_message
-        .await_component_interaction(&ctx)
-        .timeout(Duration::from_secs(10 * 60))
-        .await
-    {
-        Some(mc) => {
-            mc.create_interaction_response(ctx, |re| {
-                re.kind(InteractionResponseType::DeferredUpdateMessage)
-            })
-            .await?;
-            max_selection = mc.data.values[0].parse().unwrap();
-        }
-        None => {}
+    if let Some(mc) = setup_message
+    .await_component_interaction(ctx)
+    .timeout(Duration::from_secs(10 * 60))
+    .await {
+        mc.create_interaction_response(ctx, |re| {
+            re.kind(InteractionResponseType::DeferredUpdateMessage)
+        })
+        .await?;
+        max_selection = mc.data.values[0].parse().unwrap();
     }
 
     //add a message to role select message
@@ -769,90 +755,87 @@ async fn role_selection_message_setup(
             })
             .await?;
 
-        match setup_message
-            .await_component_interaction(&ctx)
-            .timeout(Duration::from_secs(60 * 10))
+        if let Some(mc) = setup_message
+        .await_component_interaction(ctx)
+        .timeout(Duration::from_secs(60 * 10))
+        .await {
+            mc.create_interaction_response(&ctx, |re| {
+                re.kind(InteractionResponseType::DeferredUpdateMessage)
+            })
             .await
-        {
-            Some(mc) => {
-                mc.create_interaction_response(&ctx, |re| {
-                    re.kind(InteractionResponseType::DeferredUpdateMessage)
-                })
-                .await
-                .expect("Unable to send interaction response");
+            .expect("Unable to send interaction response");
 
-                match mc.data.custom_id.as_str() {
-                    "set_message" => {
-                        setup_message
-                            .edit(&ctx, |m| {
-                                m.content("");
-                                m.embed(|e| e.title("Reply to me with the message"));
-                                m.components(|c| c.set_action_rows(vec![]))
-                            })
-                            .await
-                            .expect("Unable to edit message");
+            match mc.data.custom_id.as_str() {
+                "set_message" => {
+                    setup_message
+                        .edit(&ctx, |m| {
+                            m.content("");
+                            m.embed(|e| e.title("Reply to me with the message"));
+                            m.components(|c| c.set_action_rows(vec![]))
+                        })
+                        .await
+                        .expect("Unable to edit message");
 
-                        instructions_message = await_message_reply(&ctx, setup_message.clone())
-                            .await
-                            .expect("Unable to get a response");
+                    instructions_message = await_message_reply(ctx, setup_message.clone())
+                        .await
+                        .expect("Unable to get a response");
 
-                        setup_message
-                            .edit(&ctx, |m| m.content(&instructions_message))
-                            .await?
-                    }
-                    "add_embed" => {
-                        setup_message
-                            .edit(&ctx, |m| {
-                                m.embed(|e| e.title("Reply with json representing the embed"));
-                                m.components(|c| c.set_action_rows(vec![]))
-                            })
-                            .await
-                            .expect("Unable to edit message");
+                    setup_message
+                        .edit(&ctx, |m| m.content(&instructions_message))
+                        .await?
+                }
+                "add_embed" => {
+                    setup_message
+                        .edit(&ctx, |m| {
+                            m.embed(|e| e.title("Reply with json representing the embed"));
+                            m.components(|c| c.set_action_rows(vec![]))
+                        })
+                        .await
+                        .expect("Unable to edit message");
 
-                        let response = await_message_reply(&ctx, setup_message.clone())
-                            .await
-                            .expect("Unable to receive reply");
-                        let json: serde_json::Result<HashMap<String, Value>> =
-                            serde_json::from_str(&response);
-                        match json {
-                            Ok(mut json) => {
-                                json.insert(String::from("type"), json!("rich"));
-                                let embed: Embed = serde_json::from_str(
-                                    serde_json::to_string(&json).unwrap().as_str(),
-                                )
-                                .expect("Unable to deserialize");
-                                let embed = CreateEmbed::from(embed);
+                    let response = await_message_reply(ctx, setup_message.clone())
+                        .await
+                        .expect("Unable to receive reply");
+                    let json: serde_json::Result<HashMap<String, Value>> =
+                        serde_json::from_str(&response);
+                    match json {
+                        Ok(mut json) => {
+                            json.insert(String::from("type"), json!("rich"));
+                            let embed: Embed = serde_json::from_str(
+                                serde_json::to_string(&json).unwrap().as_str(),
+                            )
+                            .expect("Unable to deserialize");
+                            let embed = CreateEmbed::from(embed);
 
-                                embeds.push(embed)
-                            }
-                            Err(why) => {
-                                setup_message
-                                    .channel_id
-                                    .send_message(&ctx, |m| {
-                                        m.reference_message(MessageReference::from(&setup_message));
-                                        m.flags(channel::MessageFlags::EPHEMERAL);
-                                        m.content("Invalid JSON")
-                                    })
-                                    .await?;
-                                println!("{}", why);
-                            }
+                            embeds.push(embed)
+                        }
+                        Err(why) => {
+                            setup_message
+                                .channel_id
+                                .send_message(&ctx, |m| {
+                                    m.reference_message(MessageReference::from(&setup_message));
+                                    m.flags(channel::MessageFlags::EPHEMERAL);
+                                    m.content("Invalid JSON")
+                                })
+                                .await?;
+                            println!("{why}");
                         }
                     }
-                    "done" => {
-                        break;
-                    }
-                    "cancel" => {
-                        setup_message
-                            .delete(&ctx)
-                            .await
-                            .expect("Unable to delete message");
-                        return Err(anyhow!("cancel"));
-                    }
-                    _ => {}
                 }
+                "done" => {
+                    break;
+                }
+                "cancel" => {
+                    setup_message
+                        .delete(&ctx)
+                        .await
+                        .expect("Unable to delete message");
+                    return Err(anyhow!("cancel"));
+                }
+                _ => {}
             }
-            None => {}
         }
+
     }
 
     let select_menu = |selected_roles: Vec<RoleId>| {
@@ -871,7 +854,7 @@ async fn role_selection_message_setup(
                     o.value(rid);
                     // o.emoji(emoji_id.clone().into());
                     if role_descriptions.len() == selected_roles.len() {
-                        o.description(&role_descriptions.get(rid).unwrap());
+                        o.description(role_descriptions.get(rid).unwrap());
                     }
                     o
                 })
@@ -898,10 +881,10 @@ async fn role_selection_message_setup(
         .unwrap();
 
     let role_selector = RoleSelector {
-        setup_message: setup_message,
+        setup_message,
         content: instructions_message,
-        embeds: embeds,
-        action_rows: action_rows,
+        embeds,
+        action_rows,
     };
     Ok(role_selector)
 }
@@ -909,7 +892,7 @@ async fn role_selection_message_setup(
 async fn await_message_reply(ctx: &Context, parent_message: Message) -> anyhow::Result<String> {
     let timeout = 60 * 5; //In seconds
 
-    let mut event_collector = EventCollectorBuilder::new(&ctx)
+    let mut event_collector = EventCollectorBuilder::new(ctx)
         .add_event_type(EventType::MessageCreate)
         .add_channel_id(parent_message.channel_id)
         .filter(move |e| {
@@ -932,17 +915,14 @@ async fn await_message_reply(ctx: &Context, parent_message: Message) -> anyhow::
     //Reply containing message
 
     if let Some(event) = event_collector.next().await {
-        match event.as_ref() {
-            Event::MessageCreate(m) => {
-                msg = m.message.content.clone();
-                //discord sometimes hangs and doesn't delete the message
-                //hopefully this slows it down enough for discord
-                std::thread::sleep(Duration::from_secs(1));
-                if let Err(why) = m.message.delete(&ctx).await {
-                    println!("{}", why);
-                }
+        if let Event::MessageCreate(m) = event.as_ref() {
+            msg = m.message.content.clone();
+            //discord sometimes hangs and doesn't delete the message
+            //hopefully this slows it down enough for discord
+            std::thread::sleep(Duration::from_secs(1));
+            if let Err(why) = m.message.delete(&ctx).await {
+                println!("{why}");
             }
-            _ => {}
         }
     }
 

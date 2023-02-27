@@ -128,16 +128,16 @@ async fn get_embed(
         .await
     {
         Ok(msg) => {
-            return Ok(Json(json!(msg)));
+            Ok(Json(json!(msg)))
         }
         Err(why) => {
             error!("{}", why);
-            return Ok(Json(json!({
+            Ok(Json(json!({
                 "status": "error",
                 "error": "NoMessage",
-            })));
+            })))
         }
-    };
+    }
 }
 
 /// create an embed
@@ -335,7 +335,6 @@ async fn get_embed_all_guild(
                 None => {
                     message_map.insert(channel_id, Vec::new());
                     message_map.get_mut(&channel_id).unwrap().push(msg);
-                    ()
                 }
             },
             Err(Error::Http(http_err)) => {
@@ -399,7 +398,6 @@ async fn get_embed_all_channel(
                 None => {
                     message_map.insert(channel_id, Vec::new());
                     message_map.get_mut(&channel_id).unwrap().push(msg);
-                    ()
                 }
             },
             Err(Error::Http(http_err)) => {

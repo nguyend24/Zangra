@@ -12,7 +12,7 @@ pub async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
         m
             .content("Pong!")
             .reactions(vec![ReactionType::Unicode(String::from("✅"))])).await {
-        println!("Error sending message: {:?}", why);
+        println!("Error sending message: {why:?}");
     }
 
     Ok(())

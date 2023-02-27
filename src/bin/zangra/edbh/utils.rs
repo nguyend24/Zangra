@@ -9,7 +9,7 @@ use serenity::utils::Color;
 const LOG_CHANNEL_ID: u64 = 805186168647974964;
 
 pub async fn voice_state_changed(ctx: &Context, guild_id: &GuildId, old: &Option<VoiceState>, new: &VoiceState) {
-    if let Some(state_change) = identify_state(guild_id, &old, &new) {
+    if let Some(state_change) = identify_state(guild_id, old, new) {
         match state_change {
             VoiceStateChange::LeftVoiceChannel => {
                 left_voice_channel(ctx, guild_id, old, new).await;
@@ -50,7 +50,7 @@ async fn left_voice_channel(ctx: &Context, _guild_id: &GuildId, old: &Option<Voi
                 .icon_url(icon_url)
             )
             .field("Eastern Time", get_eastern_time(), false))).await {
-        println!("Error sending BH left message. Why: {}", why);
+        println!("Error sending BH left message. Why: {why}");
     };
 }
 
@@ -73,7 +73,7 @@ async fn joined_voice_channel(ctx: &Context, _guild_id: &GuildId, new: &VoiceSta
                 .icon_url(icon_url)
             )
             .field("Eastern Time", get_eastern_time(), false))).await {
-        println!("Error sending BH join message. Why: {}", why);
+        println!("Error sending BH join message. Why: {why}");
     };
 }
 
@@ -101,7 +101,7 @@ async fn moved_voice_channel(ctx: &Context, _guild_id: &GuildId, old: &Option<Vo
                 .name(&name)
                 .icon_url(icon_url))
             .field("Eastern Time", get_eastern_time(), false))).await {
-        println!("Error sending BH move message. Why: {}", why);
+        println!("Error sending BH move message. Why: {why}");
     }
 }
 
