@@ -15,14 +15,14 @@ use serenity::{
     },
     utils::Color,
 };
+use tracing::Level;
+use tracing_subscriber::{prelude::*, fmt::{layer, time::LocalTime}};
 
-use std::env;
+use std::{env, fs::File, io::Read, path::Path};
 
 use commands::{math::*, messages::*, meta::*, ping::*, role::{mutex, check_mutex_roles}, test::*};
 
 use crate::limited_budgetworks_server::utils::{add_member_join_role, add_member_welcome_message, add_role_rules_verified};
-use std::fs::File;
-use std::io::Read;
 
 use serde::{
     Deserialize, // To deserialize data into structures
@@ -31,6 +31,7 @@ use serde::{
 
 // use crate::commands::webblock::{edit_interaction, webblock, webblock_check_message};
 
+use rest_api::entry::start_rest_api;
 use crate::utils::database::{get_sqlite_pool, DatabasePool};
 
 mod commands;
@@ -39,6 +40,7 @@ mod edbh;
 mod error;
 mod limited_budgetworks_server;
 mod misc;
+mod rest_api;
 mod test_server;
 mod utils;
 
@@ -319,6 +321,8 @@ impl EventHandler for Handler {
         };
 
         setup_slash_commands(&ctx).await;
+
+        start_rest_api(&ctx).await;
     }
 
     async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
@@ -364,6 +368,21 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let log_folder = Path::new("./dirn_log");
+    let _ = tokio::fs::create_dir_all(log_folder).await;
+
+    let debug_file_appender = tracing_appender::rolling::hourly(format!("{}/debug", log_folder.to_string_lossy()), "").with_max_level(Level::DEBUG);
+    let info_file_appender = tracing_appender::rolling::hourly(format!("{}/info", log_folder.to_string_lossy()), "").with_max_level(Level::INFO);
+
+    let subscriber = tracing_subscriber::fmt::Subscriber::builder()
+    .with_max_level(Level::INFO)
+    .pretty()
+    .finish()
+    .with(layer().with_writer(debug_file_appender).with_timer(LocalTime::rfc_3339()).with_line_number(true).json())
+    .with(layer().with_writer(info_file_appender).with_timer(LocalTime::rfc_3339()).with_line_number(true).json());
+
+    tracing::subscriber::set_global_default(subscriber).expect("unable to set global subscriber");
+
     let configuration = read_configuration().unwrap();
 
     let framework = StandardFramework::new()
