@@ -1,0 +1,4 @@
+-- Add migration script here
+ALTER TABLE Embed DROP COLUMN EmbedJson;
+ALTER TABLE Embed ADD COLUMN GuildId INTEGER NOT NULL;
+ALTER TABLE Embed ADD COLUMN ChannelId INTEGER NOT NULL;
