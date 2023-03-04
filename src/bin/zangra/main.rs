@@ -270,7 +270,7 @@ impl EventHandler for Handler {
             Interaction::MessageComponent(mc) => match mc.data.custom_id.as_str() {
                 "selectmenu" => {
                     if let Err(why) = autorole_selections(&ctx, &mc).await {
-                        println!("autorole_selection err: {}", why);
+                        println!("autorole_selection err: {why}");
                     };
                 }
                 _ => {}

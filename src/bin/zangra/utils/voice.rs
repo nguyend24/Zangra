@@ -34,7 +34,7 @@ impl Display for VoiceStateChange {
 }
 
 pub fn identify_state(_guild_id: &GuildId, old_state: &Option<VoiceState>, new: &VoiceState) -> Option<VoiceStateChange> {
-    if let None = old_state {
+    if old_state.is_none() {
         return Some(VoiceStateChange::JoinedVoiceChannel)
     }
     let old_state: &VoiceState = old_state.as_ref().unwrap();
@@ -47,7 +47,7 @@ pub fn identify_state(_guild_id: &GuildId, old_state: &Option<VoiceState>, new: 
         }
     }
 
-    if let None = new.channel_id {
+    if new.channel_id.is_none() {
         return Some(VoiceStateChange::LeftVoiceChannel)
     }
 
